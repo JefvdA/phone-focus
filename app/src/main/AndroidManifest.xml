@@ -6,6 +6,19 @@
     <!-- Exact unlock alarm, granted at install (personal sideloaded app, not on Play). -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
+    <!-- Package visibility for the app catalogue (#5): launchable apps (like the app drawer)
+         and the dialer, without QUERY_ALL_PACKAGES. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+    </queries>
+
     <application
         android:name=".infrastructure.PhoneFocusApp"
         android:allowBackup="false"
