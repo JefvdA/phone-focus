@@ -19,6 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import dev.phonefocus.domain.AppVersion
 import dev.phonefocus.infrastructure.PhoneFocusApp
+import dev.phonefocus.ui.theme.RetroTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,7 +28,7 @@ class MainActivity : ComponentActivity() {
         val versionName = packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
         val container = (application as PhoneFocusApp).container
         setContent {
-            MaterialTheme {
+            RetroTheme {
                 PlaceholderScreen(AppVersion.describe(versionName)) {
                     if (container.isDebugBuild) {
                         DebugFocusPanel(container)
@@ -60,5 +61,5 @@ private fun PlaceholderScreen(label: String, extra: @Composable () -> Unit = {})
 @Preview
 @Composable
 private fun PlaceholderScreenPreview() {
-    MaterialTheme { PlaceholderScreen("phone-focus 0.1.0") }
+    RetroTheme { PlaceholderScreen("phone-focus 0.1.0") }
 }
