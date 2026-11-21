@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shows the widget on the Flip's cover screen (Flex Window), per Samsung's code lab. -->
+<samsung-appwidget-provider display="sub_screen" />

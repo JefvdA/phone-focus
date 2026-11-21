@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Retro colour tokens for views outside Compose (the cover widget, #13). Same values as
+     ui.theme.RetroColors; the contrast pairs used here are checked there. -->
+<resources>
+    <color name="retro_desktop">#FF007878</color>
+    <color name="retro_surface">#FFC0C0C0</color>
+    <color name="retro_bevel_light">#FFFFFFFF</color>
+    <color name="retro_bevel_dark">#FF404040</color>
+    <color name="retro_shadow_mid">#FF808080</color>
+    <color name="retro_title_bar">#FF000080</color>
+    <color name="retro_on_title_bar">#FFFFFFFF</color>
+    <color name="retro_field">#FFFFFFFF</color>
+    <color name="retro_text">#FF000000</color>
+    <color name="retro_disabled_text">#FF404040</color>
+</resources>

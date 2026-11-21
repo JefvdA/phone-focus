@@ -7,7 +7,10 @@ import android.util.Log
 import dev.phonefocus.infrastructure.system.FocusEventReceiver
 import kotlinx.coroutines.launch
 
-/** Composition root: builds the [AppContainer], ticks on app start, listens for screen-on. */
+/**
+ * Composition root: builds the [AppContainer], ticks on app start, listens for screen-on and
+ * keeps the cover widget current.
+ */
 class PhoneFocusApp : Application() {
     lateinit var container: AppContainer
         private set
@@ -24,6 +27,15 @@ class PhoneFocusApp : Application() {
         container.scope.launch {
             runCatching { container.commands.tick() }
                 .onFailure { Log.e("PhoneFocusApp", "tick on app start failed", it) }
+        }
+
+        // Keep the cover-screen widget (#13) in step with every change of the focus session
+        // while the process lives (commands from any screen, ticks from boot or the alarm).
+        container.scope.launch {
+            container.observeSession().collect {
+                runCatching { container.coverWidget.refresh() }
+                    .onFailure { Log.e("PhoneFocusApp", "cover widget refresh failed", it) }
+            }
         }
     }
 }
