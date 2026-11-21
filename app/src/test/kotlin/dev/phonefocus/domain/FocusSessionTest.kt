@@ -16,7 +16,7 @@ class FocusSessionTest {
     private val policy = AppPolicy(
         mapOf(
             "org.phone" to Allowed,
-            "com.instagram" to ShortVideoBlocked,
+            "com.instagram.android" to ShortVideoBlocked,
             "com.game" to Blocked,
         ),
     )
@@ -232,8 +232,8 @@ class FocusSessionTest {
     @Test
     fun `tighten rejects ShortVideoBlocked to Allowed`() {
         assertEquals(
-            FocusError.NotStricter(listOf(Loosening.AppRuleLoosened("com.instagram", ShortVideoBlocked, Allowed))),
-            focused().tighten(Tightening(rules = mapOf("com.instagram" to Allowed))).err(),
+            FocusError.NotStricter(listOf(Loosening.AppRuleLoosened("com.instagram.android", ShortVideoBlocked, Allowed))),
+            focused().tighten(Tightening(rules = mapOf("com.instagram.android" to Allowed))).err(),
         )
     }
 
@@ -264,10 +264,10 @@ class FocusSessionTest {
     @Test
     fun `tighten is all or nothing - a loosening rejects the stricter changes in the same request`() {
         val result = focused().tighten(
-            Tightening(rules = mapOf("org.phone" to Blocked, "com.instagram" to Allowed)),
+            Tightening(rules = mapOf("org.phone" to Blocked, "com.instagram.android" to Allowed)),
         )
         assertEquals(
-            FocusError.NotStricter(listOf(Loosening.AppRuleLoosened("com.instagram", ShortVideoBlocked, Allowed))),
+            FocusError.NotStricter(listOf(Loosening.AppRuleLoosened("com.instagram.android", ShortVideoBlocked, Allowed))),
             result.err(),
         )
     }
@@ -282,11 +282,12 @@ class FocusSessionTest {
 
     @Test
     fun `tighten accepts Allowed to ShortVideoBlocked, ShortVideoBlocked to Blocked and Allowed to Blocked`() {
-        val session = focused().tighten(
-            Tightening(rules = mapOf("org.phone" to ShortVideoBlocked, "com.instagram" to Blocked)),
-        ).ok()
-        assertEquals(ShortVideoBlocked, session.policy.ruleFor("org.phone"))
-        assertEquals(Blocked, session.policy.ruleFor("com.instagram"))
+        val youtube = ShortVideoApps.YOUTUBE
+        val session = unlocked().startFocus(policy.with(mapOf(youtube to Allowed)), ExitDelay.ONE_DAY).ok()
+            .tighten(Tightening(rules = mapOf(youtube to ShortVideoBlocked, "com.instagram.android" to Blocked)))
+            .ok()
+        assertEquals(ShortVideoBlocked, session.policy.ruleFor(youtube))
+        assertEquals(Blocked, session.policy.ruleFor("com.instagram.android"))
 
         val direct = focused().tighten(Tightening(rules = mapOf("org.phone" to Blocked))).ok()
         assertEquals(Blocked, direct.policy.ruleFor("org.phone"))
@@ -344,7 +345,7 @@ class FocusSessionTest {
     fun `isLaunchAllowed during focus follows the policy`() {
         for (session in listOf(focused(), exitPending())) {
             assertTrue(session.isLaunchAllowed("org.phone"))
-            assertTrue(session.isLaunchAllowed("com.instagram"))
+            assertTrue(session.isLaunchAllowed("com.instagram.android"))
             assertFalse(session.isLaunchAllowed("com.game"))
         }
     }
@@ -363,26 +364,26 @@ class FocusSessionTest {
         val session = FocusSession.initial(policy = policy)
         assertTrue(session.isLaunchAllowed("com.game"))
         assertTrue(session.isLaunchAllowed("com.unknown"))
-        assertFalse(session.isShortVideoBlocked("com.instagram"))
+        assertFalse(session.isShortVideoBlocked("com.instagram.android"))
     }
 
     @Test
     fun `isShortVideoBlocked during focus is true for ShortVideoBlocked and Blocked apps`() {
         val session = focused()
         assertFalse(session.isShortVideoBlocked("org.phone"))
-        assertTrue(session.isShortVideoBlocked("com.instagram"))
+        assertTrue(session.isShortVideoBlocked("com.instagram.android"))
         assertTrue(session.isShortVideoBlocked("com.game"))
     }
 
     @Test
     fun `allowedApps during focus lists the launchable apps`() {
-        assertEquals(setOf("org.phone", "com.instagram"), focused().allowedApps())
-        assertEquals(setOf("org.phone", "com.instagram"), exitPending().allowedApps())
+        assertEquals(setOf("org.phone", "com.instagram.android"), focused().allowedApps())
+        assertEquals(setOf("org.phone", "com.instagram.android"), exitPending().allowedApps())
     }
 
     @Test
     fun `allowedApps reflects tightening`() {
-        val session = focused().tighten(Tightening(rules = mapOf("com.instagram" to Blocked))).ok()
+        val session = focused().tighten(Tightening(rules = mapOf("com.instagram.android" to Blocked))).ok()
         assertEquals(setOf("org.phone"), session.allowedApps())
     }
 
@@ -396,7 +397,7 @@ class FocusSessionTest {
         val pending = exitPending()
         val unlocked = pending.tick(unlockAt(pending))
         assertTrue(unlocked.isLaunchAllowed("com.game"))
-        assertFalse(unlocked.isShortVideoBlocked("com.instagram"))
+        assertFalse(unlocked.isShortVideoBlocked("com.instagram.android"))
     }
 
     // --- restore ---------------------------------------------------------------------------

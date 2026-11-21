@@ -21,13 +21,16 @@ class FocusSession private constructor(
     val policy: AppPolicy,
     val exitDelay: ExitDelay,
 ) {
-    /** Unlocked -> Focused, enforcing [policy] with [delay] as exit delay. */
-    fun startFocus(policy: AppPolicy, delay: ExitDelay): FocusResult =
-        if (state == FocusState.Unlocked) {
-            success(FocusState.Focused, policy, delay)
-        } else {
-            invalid(FocusCommand.StartFocus)
-        }
+    /**
+     * Unlocked -> Focused, enforcing [policy] with [delay] as exit delay. Rejected when the
+     * policy uses a rule an app does not support (see [AppPolicy.unsupportedRulesIn]).
+     */
+    fun startFocus(policy: AppPolicy, delay: ExitDelay): FocusResult {
+        if (state != FocusState.Unlocked) return invalid(FocusCommand.StartFocus)
+        val unsupported = policy.unsupportedRulesIn()
+        if (unsupported.isNotEmpty()) return FocusResult.Failure(FocusError.UnsupportedRules(unsupported))
+        return success(FocusState.Focused, policy, delay)
+    }
 
     /** Focused -> ExitPending, with the countdown ending at [now] + [exitDelay]. */
     fun requestExit(now: Instant): FocusResult =
@@ -65,7 +68,8 @@ class FocusSession private constructor(
     /**
      * Makes the policy and/or exit delay stricter while focused (Focused or ExitPending; the
      * state, including a running `unlockAt`, is kept). Rejected as a whole if any change would
-     * loosen something; equal values are allowed and change nothing.
+     * loosen something ([FocusError.NotStricter], checked first) or use a rule an app does not
+     * support ([FocusError.UnsupportedRules]); equal values are allowed and change nothing.
      */
     fun tighten(changes: Tightening): FocusResult {
         if (!state.isFocusActive) return invalid(FocusCommand.Tighten)
@@ -78,6 +82,9 @@ class FocusSession private constructor(
             addAll(policy.looseningsIn(changes.rules))
         }
         if (loosenings.isNotEmpty()) return FocusResult.Failure(FocusError.NotStricter(loosenings))
+
+        val unsupported = policy.unsupportedRulesIn(changes.rules)
+        if (unsupported.isNotEmpty()) return FocusResult.Failure(FocusError.UnsupportedRules(unsupported))
 
         return success(state, policy.with(changes.rules), changes.exitDelay ?: exitDelay)
     }
