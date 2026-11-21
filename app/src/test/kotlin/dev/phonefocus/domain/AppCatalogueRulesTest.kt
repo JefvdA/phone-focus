@@ -67,6 +67,39 @@ class AppCatalogueRulesTest {
     // --- ShortVideoBlocked only for supported apps -----------------------------------------
 
     @Test
+    fun `stricter options of an Allowed app are the stricter rules it supports`() {
+        val insta = ShortVideoApps.INSTAGRAM
+        assertEquals(listOf(Allowed, ShortVideoBlocked, Blocked), AppRuleOptions.stricterThan(insta, Allowed, essential))
+        assertEquals(listOf(Allowed, Blocked), AppRuleOptions.stricterThan("com.example.maps", Allowed, essential))
+    }
+
+    @Test
+    fun `stricter options of a No short videos app are itself and Blocked`() {
+        assertEquals(
+            listOf(ShortVideoBlocked, Blocked),
+            AppRuleOptions.stricterThan(ShortVideoApps.YOUTUBE, ShortVideoBlocked, essential),
+        )
+    }
+
+    @Test
+    fun `stricter options never contain a looser rule`() {
+        val packages = ShortVideoApps.PACKAGES + setOf("com.example.maps", self, settings, dialer)
+        for (pkg in packages) {
+            for (current in AppRule.entries) {
+                val options = AppRuleOptions.stricterThan(pkg, current, essential)
+                assertEquals(current, options.first())
+                assertTrue("$pkg $current -> $options", options.all { current.allowsChangeTo(it) })
+            }
+        }
+    }
+
+    @Test
+    fun `Blocked and essential apps cannot be made stricter`() {
+        assertEquals(listOf(Blocked), AppRuleOptions.stricterThan(ShortVideoApps.INSTAGRAM, Blocked, essential))
+        assertEquals(listOf(Allowed), AppRuleOptions.stricterThan(settings, Allowed, essential))
+    }
+
+    @Test
     fun `unsupportedRulesIn lists ShortVideoBlocked for apps outside the registry`() {
         val policy = AppPolicy(
             mapOf(
