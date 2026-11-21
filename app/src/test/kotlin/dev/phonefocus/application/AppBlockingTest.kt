@@ -66,7 +66,9 @@ class AppBlockingTest {
     @Test
     fun `allowed and no-short-video apps stay`() {
         assertEquals(ForegroundVerdict.Allowed, context().verdict(whatsapp))
-        assertEquals(ForegroundVerdict.Allowed, context().verdict(instagram))
+        assertEquals(ForegroundVerdict.ShortVideosBlocked, context().verdict(instagram))
+        assertEquals(ForegroundVerdict.ShortVideosBlocked, context(exitPending()).verdict(instagram))
+        assertFalse(ForegroundVerdict.ShortVideosBlocked.bounces)
     }
 
     @Test
