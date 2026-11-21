@@ -31,11 +31,14 @@ class ObserveFocusSession(private val repository: FocusSessionRepository) {
  * Whole commands (clock reading, update and alarm sync) run one at a time under [mutex], so a
  * reading is never older than the checkpoint it is compared with, and a slower command cannot
  * cancel or replace the alarm a later one scheduled. Use one instance per process.
+ *
+ * When a [tick] ends the countdown (ExitPending -> Unlocked), [notifier] tells the user, once.
  */
 class FocusCommands(
     private val repository: FocusSessionRepository,
     private val clock: DeviceClock,
     private val scheduler: UnlockScheduler,
+    private val notifier: FocusNotifier = FocusNotifier.NONE,
 ) {
     private val mutex = Mutex()
 
@@ -55,15 +58,20 @@ class FocusCommands(
     /**
      * Advances time: unlocks once the countdown has ended, otherwise refreshes the time
      * checkpoint and re-schedules the unlock. Safe to call any time; run it on app start, boot,
-     * screen-on, shutdown and when the unlock alarm fires.
+     * screen-on, shutdown and when the unlock alarm fires. The tick that ends the countdown
+     * posts the "Focus ended" notification ([FocusNotifier]); later ticks don't.
      */
     suspend fun tick(): FocusSession = mutex.withLock {
+        var ended = false
         val record = repository.update { record ->
             val reading = clock.read()
             val now = TrustedTime.now(reading, record.checkpoint)
-            withCheckpoint(record.session.tick(now), reading, now)
+            val next = record.session.tick(now)
+            ended = focusEnded(record.session, next)
+            nextRecord(record, next, reading, now)
         }
         syncUnlockAlarm(record)
+        if (ended) notifier.focusEnded()
         record.session
     }
 
@@ -75,19 +83,26 @@ class FocusCommands(
             result = command(record.session, now)
             when (val r = result) {
                 is FocusResult.Failure -> record
-                is FocusResult.Success -> withCheckpoint(r.session, reading, now)
+                is FocusResult.Success -> nextRecord(record, r.session, reading, now)
             }
         }
         if (result is FocusResult.Success) syncUnlockAlarm(record)
         result
     }
 
-    /** [session] with a checkpoint at [now] while its countdown runs, without one otherwise. */
-    private fun withCheckpoint(session: FocusSession, reading: ClockReading, now: Instant) =
-        FocusRecord(
-            session,
-            TrustedTime.checkpoint(reading, now).takeIf { session.state is FocusState.ExitPending },
-        )
+    /**
+     * [session] with a checkpoint at [now] while its countdown runs, without one otherwise. The
+     * countdown start is [now] for a new countdown and kept for a running one (same `unlockAt`).
+     */
+    private fun nextRecord(previous: FocusRecord, session: FocusSession, reading: ClockReading, now: Instant): FocusRecord {
+        if (session.state !is FocusState.ExitPending) return FocusRecord(session)
+        val startedAt = if (previous.session.state == session.state) previous.countdownStartedAt else now
+        return FocusRecord(session, TrustedTime.checkpoint(reading, now), startedAt)
+    }
+
+    /** Whether going from [before] to [after] is the countdown ending (ExitPending -> Unlocked). */
+    private fun focusEnded(before: FocusSession, after: FocusSession): Boolean =
+        before.state is FocusState.ExitPending && after.state == FocusState.Unlocked
 
     /** Schedules the unlock for the remaining countdown, or cancels it when none runs. */
     private fun syncUnlockAlarm(record: FocusRecord) {

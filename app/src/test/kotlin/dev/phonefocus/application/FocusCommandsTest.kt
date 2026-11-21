@@ -30,7 +30,8 @@ class FocusCommandsTest {
     private val repo = FakeRepository()
     private val clock = FakeDeviceClock(t0)
     private val scheduler = FakeScheduler()
-    private val commands = FocusCommands(repo, clock, scheduler)
+    private val notifier = FakeNotifier()
+    private val commands = FocusCommands(repo, clock, scheduler, notifier)
     private val observe = ObserveFocusSession(repo)
 
     private val record get() = repo.state.value
@@ -131,6 +132,58 @@ class FocusCommandsTest {
         assertEquals(FocusState.Unlocked, state)
         assertNull(record.checkpoint)
         assertNull(scheduler.scheduled)
+    }
+
+    // --- countdown start and "Focus ended" ----------------------------------------------------
+
+    @Test
+    fun `requestExit stores the countdown start, which ticks and tighten keep`() = runBlocking {
+        exitPending()
+        assertEquals(t0, record.countdownStartedAt)
+        clock.advance(Duration.ofHours(3))
+        commands.tick()
+        commands.tighten(Tightening(exitDelay = ExitDelay.SEVEN_DAYS)).assertSuccess()
+        assertEquals(t0, record.countdownStartedAt)
+    }
+
+    @Test
+    fun `cancelExit and unlocking clear the countdown start, a new request starts a new one`() = runBlocking {
+        exitPending()
+        clock.advance(Duration.ofHours(1))
+        commands.cancelExit().assertSuccess()
+        assertNull(record.countdownStartedAt)
+        clock.advance(Duration.ofHours(1))
+        commands.requestExit().assertSuccess()
+        assertEquals(t0 + Duration.ofHours(2), record.countdownStartedAt)
+        clock.advance(day)
+        commands.tick()
+        assertNull(record.countdownStartedAt)
+    }
+
+    @Test
+    fun `the tick that ends the countdown posts Focus ended, once`() = runBlocking {
+        exitPending()
+        clock.advance(day.minusSeconds(1))
+        commands.tick()
+        assertEquals(0, notifier.focusEndedCount)
+        clock.advance(Duration.ofSeconds(1))
+        commands.tick()
+        assertEquals(1, notifier.focusEndedCount)
+        commands.tick()
+        clock.advance(day)
+        commands.tick()
+        assertEquals(1, notifier.focusEndedCount)
+    }
+
+    @Test
+    fun `no Focus ended for other transitions`() = runBlocking {
+        commands.tick()
+        exitPending()
+        commands.cancelExit().assertSuccess()
+        clock.advance(Duration.ofDays(3))
+        commands.tick()
+        commands.tighten(Tightening(exitDelay = ExitDelay.SEVEN_DAYS)).assertSuccess()
+        assertEquals(0, notifier.focusEndedCount)
     }
 
     @Test

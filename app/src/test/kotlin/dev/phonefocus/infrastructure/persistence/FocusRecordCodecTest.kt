@@ -44,15 +44,20 @@ class FocusRecordCodecTest {
             FocusRecord(FocusSession.restore(FocusState.Unlocked, AppPolicy.EMPTY, ExitDelay.TWELVE_HOURS)),
             FocusRecord(FocusSession.restore(FocusState.Focused, policy, ExitDelay.SEVEN_DAYS)),
             FocusRecord(FocusSession.restore(FocusState.ExitPending(unlockAt), policy, ExitDelay(Duration.ofMinutes(1))), checkpoint),
+            FocusRecord(
+                FocusSession.restore(FocusState.ExitPending(unlockAt), policy, ExitDelay.ONE_DAY),
+                checkpoint,
+                countdownStartedAt = unlockAt.minus(Duration.ofDays(1)),
+            ),
         )
         records.forEach { assertEquals(it, roundTrip(it)) }
     }
 
     @Test
-    fun `encoding replaces a previous checkpoint`() {
+    fun `encoding replaces a previous checkpoint and countdown start`() {
         val prefs = mutablePreferencesOf()
         val pending = FocusSession.restore(FocusState.ExitPending(unlockAt), policy, ExitDelay.ONE_DAY)
-        FocusRecordCodec.encode(FocusRecord(pending, TimeCheckpoint(unlockAt, Duration.ZERO, 1)), prefs)
+        FocusRecordCodec.encode(FocusRecord(pending, TimeCheckpoint(unlockAt, Duration.ZERO, 1), unlockAt), prefs)
         val focused = FocusRecord(FocusSession.restore(FocusState.Focused, policy, ExitDelay.ONE_DAY))
         FocusRecordCodec.encode(focused, prefs)
         assertEquals(focused, FocusRecordCodec.decode(prefs))
