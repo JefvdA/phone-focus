@@ -66,3 +66,11 @@ class FakeScheduler : UnlockScheduler {
         calls += "cancel"
     }
 }
+
+/** Every prerequisite [PrerequisiteStatus.Met] unless changed in [statuses]. */
+class FakePrerequisites : StartPrerequisites {
+    val statuses: MutableMap<StartPrerequisite, PrerequisiteStatus> =
+        StartPrerequisite.entries.associateWith { PrerequisiteStatus.Met }.toMutableMap()
+
+    override suspend fun status(prerequisite: StartPrerequisite): PrerequisiteStatus = statuses.getValue(prerequisite)
+}
