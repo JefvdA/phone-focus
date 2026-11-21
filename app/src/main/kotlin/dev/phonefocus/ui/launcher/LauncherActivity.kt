@@ -51,6 +51,14 @@ class LauncherActivity : ComponentActivity() {
                         onCloseDialog = viewModel::closeDialog,
                         onOpenSetup = ::openSetup,
                         onSwitchHomeBack = ::openHomeSettings,
+                        stricter = MakeStricterActions(
+                            onRuleChange = viewModel::setStricterRule,
+                            onExitDelayChange = viewModel::setStricterDelay,
+                            onApply = viewModel::requestApplyStricter,
+                            onConfirmApply = viewModel::confirmApplyStricter,
+                            onDismissConfirmation = viewModel::dismissStricterConfirmation,
+                            onCancel = { viewModel.openDialog(LauncherDialog.Focus) },
+                        ),
                     )
                 }
                 DesktopScreen(state, actions) { rememberAppIconPainter(it, icons) }

@@ -59,6 +59,8 @@ class LauncherActions(
     val onOpenSetup: () -> Unit,
     /** The system "Default home app" settings, to switch back to One UI Home. */
     val onSwitchHomeBack: () -> Unit,
+    /** The "Make stricter" dialog (C4). */
+    val stricter: MakeStricterActions,
 )
 
 /**
@@ -99,7 +101,15 @@ fun DesktopScreen(
     when (state.dialog) {
         LauncherDialog.Menu -> MenuDialog(focusActive, actions)
         LauncherDialog.Focus -> if (desktop != null && focusActive) {
-            FocusDialog(desktop.session, state.remaining, actions.onCloseDialog)
+            FocusDialog(
+                desktop.session,
+                state.remaining,
+                onMakeStricter = { actions.onOpenDialog(LauncherDialog.MakeStricter) },
+                onClose = actions.onCloseDialog,
+            )
+        }
+        LauncherDialog.MakeStricter -> if (desktop != null && focusActive) {
+            MakeStricterDialog(state.stricter, desktop.session.state is FocusState.ExitPending, actions.stricter, appIcon)
         }
         null -> Unit
     }
@@ -141,7 +151,7 @@ private fun FocusOffWindow(actions: LauncherActions, modifier: Modifier = Modifi
 
 /** The Focus dialog, opened from the taskbar: state, exit delay and the ways to change it. */
 @Composable
-private fun FocusDialog(session: FocusSession, remaining: Duration?, onClose: () -> Unit) {
+private fun FocusDialog(session: FocusSession, remaining: Duration?, onMakeStricter: () -> Unit, onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose) {
         RetroWindow(title = "Focus", onClose = onClose) {
             Text(LauncherLabels.FOCUS_ON, style = RetroTypography.Body)
@@ -153,8 +163,7 @@ private fun FocusDialog(session: FocusSession, remaining: Duration?, onClose: ()
             }
             Spacer(Modifier.height(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // TODO(#9): open the "Make stricter" dialog.
-                RetroButton("Make stricter…", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
+                RetroButton("Make stricter…", onClick = onMakeStricter, modifier = Modifier.fillMaxWidth())
                 // TODO(#10): open the emergency escape / exit countdown flow.
                 RetroButton("Emergency escape…", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
                 RetroButton("Close", onClick = onClose, isDefault = true, modifier = Modifier.fillMaxWidth())
@@ -209,7 +218,7 @@ private fun previewDesktop(state: FocusState): FocusDesktop {
     return FocusDesktop.of(session, apps, EssentialApps.NONE, "dev.phonefocus")
 }
 
-private val previewActions = LauncherActions({}, {}, {}, {}, {})
+private val previewActions = LauncherActions({}, {}, {}, {}, {}, MakeStricterActions({ _, _ -> }, {}, {}, {}, {}, {}))
 
 @Preview(widthDp = 360, heightDp = 640)
 @Composable
