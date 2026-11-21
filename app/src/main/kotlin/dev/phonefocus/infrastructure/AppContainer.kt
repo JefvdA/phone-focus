@@ -19,6 +19,7 @@ import dev.phonefocus.infrastructure.apps.AppLauncher
 import dev.phonefocus.infrastructure.apps.PackageManagerAppCatalogue
 import dev.phonefocus.infrastructure.persistence.DataStoreFocusSessionRepository
 import dev.phonefocus.infrastructure.persistence.FocusRecordCodec
+import dev.phonefocus.infrastructure.system.AndroidFocusNotifier
 import dev.phonefocus.infrastructure.system.AndroidStartPrerequisites
 import dev.phonefocus.infrastructure.time.AlarmUnlockScheduler
 import dev.phonefocus.infrastructure.time.AndroidDeviceClock
@@ -47,6 +48,7 @@ class AppContainer(context: Context) {
         repository = repository,
         clock = deviceClock,
         scheduler = AlarmUnlockScheduler(appContext),
+        notifier = AndroidFocusNotifier(appContext),
     )
 
     val observeSession = ObserveFocusSession(repository)
