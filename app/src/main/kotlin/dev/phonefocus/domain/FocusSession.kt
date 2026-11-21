@@ -125,5 +125,13 @@ class FocusSession private constructor(
             policy: AppPolicy = AppPolicy.EMPTY,
             exitDelay: ExitDelay = ExitDelay.ONE_DAY,
         ): FocusSession = FocusSession(FocusState.Unlocked, policy, exitDelay)
+
+        /**
+         * Rehydrates a session that was persisted earlier (state, policy and delay exactly as
+         * saved). Only for repositories loading a previously saved session; not a command, so
+         * it must never be used to bypass the transitions above.
+         */
+        fun restore(state: FocusState, policy: AppPolicy, exitDelay: ExitDelay): FocusSession =
+            FocusSession(state, policy, exitDelay)
     }
 }
