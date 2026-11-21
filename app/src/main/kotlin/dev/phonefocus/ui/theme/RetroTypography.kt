@@ -23,4 +23,7 @@ object RetroTypography {
     val Title = TextStyle(fontFamily = PixelifySans, fontWeight = FontWeight.Bold, fontSize = 18.sp, lineHeight = 22.sp)
     val Body = TextStyle(fontFamily = PixelifySans, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 20.sp)
     val Label = TextStyle(fontFamily = PixelifySans, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 18.sp)
+
+    /** The big exit countdown (hh:mm:ss) of the exit-pending dialog (C5). */
+    val Countdown = TextStyle(fontFamily = PixelifySans, fontWeight = FontWeight.Bold, fontSize = 40.sp, lineHeight = 44.sp)
 }

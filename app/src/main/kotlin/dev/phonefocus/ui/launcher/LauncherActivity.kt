@@ -59,6 +59,8 @@ class LauncherActivity : ComponentActivity() {
                             onDismissConfirmation = viewModel::dismissStricterConfirmation,
                             onCancel = { viewModel.openDialog(LauncherDialog.Focus) },
                         ),
+                        onConfirmEmergencyEscape = viewModel::confirmEmergencyEscape,
+                        onCancelExit = viewModel::cancelExit,
                     )
                 }
                 DesktopScreen(state, actions) { rememberAppIconPainter(it, icons) }

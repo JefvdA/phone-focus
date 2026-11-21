@@ -1,12 +1,15 @@
 package dev.phonefocus.ui
 
+import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,6 +36,11 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: FocusSetupViewModel by viewModels { FocusSetupViewModel.factory(container) }
 
+    // Optional: without it the "Focus ended" notification (#10) is skipped, nothing else changes.
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        Log.i("MainActivity", "notification permission granted: $granted")
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -57,7 +65,10 @@ class MainActivity : ComponentActivity() {
                     FocusSetupActions(
                         onRuleChange = viewModel::setRule,
                         onExitDelayChange = viewModel::setExitDelay,
-                        onStart = viewModel::requestStart,
+                        onStart = {
+                            askForNotifications()
+                            viewModel.requestStart()
+                        },
                         onConfirmStart = viewModel::confirmStart,
                         onDismissConfirmation = viewModel::dismissConfirmation,
                         onOpenSettings = ::openSettings,
@@ -76,6 +87,16 @@ class MainActivity : ComponentActivity() {
                     },
                 )
             }
+        }
+    }
+
+    /**
+     * Asks once per start for permission to post notifications, so the user hears when focus
+     * ends (#10). A refusal is respected: the notification is then skipped silently.
+     */
+    private fun askForNotifications() {
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 

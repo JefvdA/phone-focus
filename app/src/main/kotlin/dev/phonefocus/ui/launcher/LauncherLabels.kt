@@ -17,10 +17,36 @@ internal object LauncherLabels {
 
     fun exitDelay(delay: ExitDelay): String = "Exit delay: ${SetupLabels.exitDelay(delay)}"
 
-    fun exitPending(remaining: Duration): String =
-        "Exit requested. The phone unlocks in ${ExitCountdown.format(remaining)} (hours:minutes)."
 
     const val FOCUS_ON = "Focus mode is on."
+
+    // --- Emergency escape and exit pending (C5, #10) ----------------------------------------
+
+    /** Before `requestExit`, with the session's actual delay, e.g. "The phone unlocks in 24 hours." */
+    fun emergencyConfirmation(delay: ExitDelay): String =
+        "The phone unlocks in ${SetupLabels.exitDelay(delay)}. Continue?\n\n" +
+            "Focus mode stays on until then. You can cancel the exit at any time."
+
+    const val EXIT_PENDING_INTRO = "Exit requested. The phone unlocks in:"
+
+    const val EXIT_PENDING_NOTE = "Focus mode stays on until the countdown ends."
+
+    /** The big countdown, e.g. "23:41:07"; rounded up, never less than the time actually left. */
+    fun exitCountdown(remaining: Duration): String = ExitCountdown.formatWithSeconds(remaining)
+
+    /** Why `requestExit` / `cancelExit` was rejected, e.g. the countdown already ended. */
+    fun exitRejected(error: FocusError): String = when (error) {
+        is FocusError.InvalidTransition -> when (error.from) {
+            FocusState.Unlocked -> "Focus mode has already ended."
+            FocusState.Focused -> "No exit is requested."
+            is FocusState.ExitPending -> "Exit is already requested."
+        }
+        else -> "This can't be done now."
+    }
+
+    const val EXIT_REQUEST_FAILED = "Could not request exit."
+
+    const val EXIT_CANCEL_FAILED = "Could not cancel the exit."
 
     const val FOCUS_OFF =
         "Focus mode is off: your phone is unlocked. Switch the home screen back to One UI Home, " +
