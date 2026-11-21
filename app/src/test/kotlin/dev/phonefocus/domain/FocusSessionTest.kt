@@ -398,4 +398,44 @@ class FocusSessionTest {
         assertTrue(unlocked.isLaunchAllowed("com.game"))
         assertFalse(unlocked.isShortVideoBlocked("com.instagram"))
     }
+
+    // --- restore ---------------------------------------------------------------------------
+
+    @Test
+    fun `restore rehydrates every state with its policy and delay`() {
+        val states = listOf(FocusState.Unlocked, FocusState.Focused, FocusState.ExitPending(t0))
+        for (state in states) {
+            val restored = FocusSession.restore(state, policy, ExitDelay.TWO_DAYS)
+            assertEquals(state, restored.state)
+            assertEquals(policy, restored.policy)
+            assertEquals(ExitDelay.TWO_DAYS, restored.exitDelay)
+        }
+    }
+
+    @Test
+    fun `restore equals the session it was saved from`() {
+        val pending = exitPending(ExitDelay.SEVEN_DAYS)
+        assertEquals(pending, FocusSession.restore(pending.state, pending.policy, pending.exitDelay))
+    }
+
+    @Test
+    fun `a restored ExitPending session keeps its unlockAt and invariants`() {
+        val restored = FocusSession.restore(FocusState.ExitPending(t0), policy, ExitDelay.ONE_DAY)
+        assertSame(restored, restored.tick(t0.minusMillis(1)))
+        assertEquals(FocusState.Unlocked, restored.tick(t0).state)
+        assertTrue(restored.startFocus(policy, ExitDelay.ONE_DAY).err() is FocusError.InvalidTransition)
+        assertTrue(restored.tighten(Tightening(exitDelay = ExitDelay.TWELVE_HOURS)).err() is FocusError.NotStricter)
+        assertEquals(FocusState.ExitPending(t0), restored.tighten(Tightening(exitDelay = ExitDelay.TWO_DAYS)).ok().state)
+    }
+
+    @Test
+    fun `a restored Focused session can only leave focus through the countdown`() {
+        val restored = FocusSession.restore(FocusState.Focused, policy, ExitDelay.TWELVE_HOURS)
+        assertSame(restored, restored.tick(t0.plus(Duration.ofDays(365))))
+        assertFalse(restored.isLaunchAllowed("com.game"))
+        assertEquals(
+            FocusState.ExitPending(t0.plus(Duration.ofHours(12))),
+            restored.requestExit(t0).ok().state,
+        )
+    }
 }

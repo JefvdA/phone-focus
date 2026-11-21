@@ -61,6 +61,33 @@ Requires JDK 17+ and the Android SDK (`ANDROID_HOME`).
 # APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## Focus session persistence and unlock timing
+
+The focus session is stored in a Preferences DataStore (`infrastructure/persistence`), so it
+survives app kills and reboots. The app re-evaluates it (`tick`: unlock if the countdown has
+ended, otherwise re-schedule the unlock) on app start, boot, app update, screen-on /
+user-present, shutdown, and when the unlock alarm fires. The alarm is an exact
+`ELAPSED_REALTIME_WAKEUP` alarm (`USE_EXACT_ALARM`); if exact alarms are not allowed it falls
+back to an inexact one, which can only make the unlock a little late, never early.
+
+### Clock tampering (v1)
+
+While an exit countdown runs, time is measured with the monotonic clock
+(`SystemClock.elapsedRealtime()`) from a persisted checkpoint, not with the system clock
+(decision in #4, see `application/TrustedTime.kt`):
+
+- Changing the system time does not shorten (or lengthen) a running countdown.
+- After a reboot, only the time since boot is added to the last checkpoint: **the countdown
+  pauses while the phone is off**, so it can end later than the shown time, never earlier.
+
+Residual risks in v1: the shown unlock time can be off by the time the phone was switched
+off; screen-on is only observed while the app process is alive (boot and the alarm cover the
+rest); and like everything in v1 the app itself can still be escaped (uninstall, clear data).
+Device Owner (#14) locks this down.
+
+Debug builds show a small debug panel with a one-minute exit delay
+(`ExitDelayOptions.DEBUG_ONE_MINUTE`) to test the countdown and reboots on the phone.
+
 ## Project layout
 
 Single `app` module, Kotlin + Jetpack Compose, minSdk 34. Code lives under
