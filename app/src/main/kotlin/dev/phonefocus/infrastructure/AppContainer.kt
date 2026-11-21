@@ -8,11 +8,14 @@ import dev.phonefocus.application.ExitDelayOptions
 import dev.phonefocus.application.FocusCommands
 import dev.phonefocus.application.ObserveAppCatalogue
 import dev.phonefocus.application.ObserveFocusSession
+import dev.phonefocus.application.StartFocusFromSetup
+import dev.phonefocus.application.StartPrerequisites
 import dev.phonefocus.domain.ExitDelay
 import dev.phonefocus.infrastructure.apps.AppIconLoader
 import dev.phonefocus.infrastructure.apps.PackageManagerAppCatalogue
 import dev.phonefocus.infrastructure.persistence.DataStoreFocusSessionRepository
 import dev.phonefocus.infrastructure.persistence.FocusRecordCodec
+import dev.phonefocus.infrastructure.system.AndroidStartPrerequisites
 import dev.phonefocus.infrastructure.time.AlarmUnlockScheduler
 import dev.phonefocus.infrastructure.time.AndroidDeviceClock
 import kotlinx.coroutines.CoroutineScope
@@ -51,4 +54,8 @@ class AppContainer(context: Context) {
     val isDebugBuild: Boolean = (appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     val exitDelays: List<ExitDelay> = ExitDelayOptions.available(isDebugBuild)
+
+    val startPrerequisites: StartPrerequisites = AndroidStartPrerequisites(appContext)
+
+    val startFocusFromSetup = StartFocusFromSetup(commands, startPrerequisites)
 }
