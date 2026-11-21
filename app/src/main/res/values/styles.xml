@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A quick button of the cover widget (#13): raised retro button, at least 48dp tall. -->
+    <style name="CoverWidgetButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@drawable/retro_button_raised</item>
+        <item name="android:fontFamily">@font/pixelify_sans</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/retro_text</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+</resources>

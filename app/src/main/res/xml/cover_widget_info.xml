@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The cover-screen widget (#13). Size, resize mode and the keyguard category as required by
+     Samsung's "Develop a widget for Flex Window" code lab; updates come from the app itself
+     (state changes and a countdown alarm), so there is no periodic update. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/cover_widget_description"
+    android:initialLayout="@layout/cover_widget"
+    android:minWidth="352dp"
+    android:minHeight="339dp"
+    android:previewLayout="@layout/cover_widget"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="keyguard" />

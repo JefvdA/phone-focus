@@ -6,12 +6,14 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.preferencesDataStore
 import dev.phonefocus.application.AppBlockerStatusSource
 import dev.phonefocus.application.CheckAppLaunch
+import dev.phonefocus.application.CheckQuickAction
 import dev.phonefocus.application.ExitCountdown
 import dev.phonefocus.application.ExitDelayOptions
 import dev.phonefocus.application.FocusCommands
 import dev.phonefocus.application.ObserveAppBlockerWarning
 import dev.phonefocus.application.ObserveAppBlocking
 import dev.phonefocus.application.ObserveAppCatalogue
+import dev.phonefocus.application.ObserveCoverScreen
 import dev.phonefocus.application.ObserveFocusDesktop
 import dev.phonefocus.application.ObserveFocusSession
 import dev.phonefocus.application.StartFocusFromSetup
@@ -20,6 +22,8 @@ import dev.phonefocus.domain.ExitDelay
 import dev.phonefocus.infrastructure.apps.AppIconLoader
 import dev.phonefocus.infrastructure.apps.AppLauncher
 import dev.phonefocus.infrastructure.apps.PackageManagerAppCatalogue
+import dev.phonefocus.infrastructure.cover.AndroidQuickActions
+import dev.phonefocus.infrastructure.cover.CoverWidget
 import dev.phonefocus.infrastructure.persistence.DataStoreFocusSessionRepository
 import dev.phonefocus.infrastructure.persistence.FocusRecordCodec
 import dev.phonefocus.infrastructure.system.AndroidAppBlockerStatus
@@ -95,4 +99,14 @@ class AppContainer(context: Context) {
     val appBlockerStatus: AppBlockerStatusSource = AndroidAppBlockerStatus(appContext, startPrerequisites)
 
     val observeAppBlockerWarning = ObserveAppBlockerWarning(observeSession, appBlockerStatus)
+
+    /** The apps behind the cover screen's quick buttons (#13). */
+    val quickActions = AndroidQuickActions(appContext)
+
+    val observeCoverScreen = ObserveCoverScreen(repository, deviceClock, appCatalogue, quickActions)
+
+    val checkQuickAction = CheckQuickAction(observeSession, appCatalogue, quickActions)
+
+    /** The cover-screen widget (#13). */
+    val coverWidget = CoverWidget(appContext, observeCoverScreen)
 }

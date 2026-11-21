@@ -21,6 +21,8 @@ class FocusEventReceiver : BroadcastReceiver() {
         app.container.scope.launch {
             try {
                 app.container.commands.tick()
+                // Before finish(): the process may be gone soon after (e.g. the unlock alarm).
+                app.container.coverWidget.refresh()
             } catch (e: Exception) {
                 Log.e(TAG, "tick failed for ${intent.action}", e)
             } finally {
