@@ -34,6 +34,24 @@
             </intent-filter>
         </activity>
 
+        <!-- The focus launcher (#8). The setup asks the user to pick it as default home app. -->
+        <activity
+            android:name=".ui.launcher.LauncherActivity"
+            android:clearTaskOnLaunch="true"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:resumeWhilePausing="true"
+            android:stateNotNeeded="true"
+            android:taskAffinity=""
+            android:windowSoftInputMode="adjustPan">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".infrastructure.system.FocusEventReceiver"
             android:exported="false">

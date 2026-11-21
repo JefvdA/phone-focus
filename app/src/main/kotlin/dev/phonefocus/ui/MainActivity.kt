@@ -1,6 +1,7 @@
 package dev.phonefocus.ui
 
 import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -12,6 +13,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import dev.phonefocus.application.PrerequisiteStatus
 import dev.phonefocus.application.StartPrerequisite
 import dev.phonefocus.domain.AppVersion
 import dev.phonefocus.infrastructure.AppContainer
@@ -22,6 +25,7 @@ import dev.phonefocus.ui.setup.FocusSetupEvent
 import dev.phonefocus.ui.setup.FocusSetupScreen
 import dev.phonefocus.ui.setup.FocusSetupViewModel
 import dev.phonefocus.ui.theme.RetroTheme
+import kotlinx.coroutines.launch
 
 /** Opened from the app icon in One UI: the focus setup screen (C2, #7). */
 class MainActivity : ComponentActivity() {
@@ -83,8 +87,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Focus has started: show the focus launcher. v1 cannot set the default home app itself
+     * (#14 automates this), so if this app is not the default home yet, the system "Default
+     * home app" settings open for the user to pick it.
+     */
     private fun openFocusLauncher() {
-        // TODO(#8): switch to the focus launcher (retro desktop). Until it exists the setup
-        //  screen stays open and shows that focus mode is on.
+        lifecycleScope.launch {
+            val home = container.startPrerequisites.status(StartPrerequisite.DefaultHome)
+            if (home == PrerequisiteStatus.Missing) {
+                openSettings(StartPrerequisite.DefaultHome)
+            } else {
+                startActivity(
+                    Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+                finish()
+            }
+        }
     }
 }
