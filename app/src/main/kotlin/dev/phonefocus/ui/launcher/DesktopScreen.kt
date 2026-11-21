@@ -1,6 +1,9 @@
 package dev.phonefocus.ui.launcher
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -64,6 +67,8 @@ class LauncherActions(
     val onOpenSetup: () -> Unit,
     /** The system "Default home app" settings, to switch back to One UI Home. */
     val onSwitchHomeBack: () -> Unit,
+    /** The system Accessibility settings, to turn the app blocker back on (#11). */
+    val onOpenBlockerSettings: () -> Unit,
     /** The "Make stricter" dialog (C4). */
     val stricter: MakeStricterActions,
     /** Emergency escape confirmed: start the exit countdown (C5). */
@@ -90,8 +95,14 @@ fun DesktopScreen(
         Box(Modifier.weight(1f).fillMaxWidth().statusBarsPadding()) {
             when {
                 desktop == null -> Unit
-                focusActive -> AppGrid(desktop.apps, actions.onOpenApp, appIcon)
+                focusActive -> Column {
+                    if (state.blockerOff) BlockerOffWindow(actions.onOpenBlockerSettings, Modifier.padding(8.dp))
+                    AppGrid(desktop.apps, actions.onOpenApp, appIcon)
+                }
                 else -> FocusOffWindow(actions, Modifier.align(Alignment.Center).padding(16.dp))
+            }
+            if (state.blockedNotice && focusActive) {
+                BlockedNotice(Modifier.align(Alignment.BottomCenter).padding(16.dp))
             }
         }
         Box(Modifier.background(RetroColors.Surface).navigationBarsPadding()) {
@@ -161,6 +172,28 @@ private fun AppGrid(
             Box(contentAlignment = Alignment.TopCenter) {
                 DesktopIcon(icon = appIcon(app.packageName), label = app.label, onClick = { onOpenApp(app.packageName) })
             }
+        }
+    }
+}
+
+/** Focus is on but the app blocker (accessibility service) is off: blocked apps can be opened. */
+@Composable
+private fun BlockerOffWindow(onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+    RetroWindow(title = LauncherLabels.BLOCKER_OFF_TITLE, modifier = modifier.fillMaxWidth()) {
+        Text(LauncherLabels.BLOCKER_OFF, style = RetroTypography.Body)
+        Spacer(Modifier.height(8.dp))
+        RetroButton("Open settings", onClick = onOpenSettings, isDefault = true, modifier = Modifier.fillMaxWidth())
+    }
+}
+
+/** The short notice after the app blocker sent a blocked app back here (#11). */
+@Composable
+private fun BlockedNotice(modifier: Modifier = Modifier) {
+    RetroWindow(title = "Phone Focus", modifier = modifier) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(rememberVectorPainter(RetroIcons.Lock), contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(LauncherLabels.BLOCKED_NOTICE, style = RetroTypography.Body)
         }
     }
 }
@@ -308,7 +341,7 @@ private fun previewDesktop(state: FocusState): FocusDesktop {
     return FocusDesktop.of(session, apps, EssentialApps.NONE, "dev.phonefocus")
 }
 
-private val previewActions = LauncherActions({}, {}, {}, {}, {}, MakeStricterActions({ _, _ -> }, {}, {}, {}, {}, {}), {}, {})
+private val previewActions = LauncherActions({}, {}, {}, {}, {}, {}, MakeStricterActions({ _, _ -> }, {}, {}, {}, {}, {}), {}, {})
 
 @Preview(widthDp = 360, heightDp = 640)
 @Composable
@@ -316,6 +349,18 @@ private fun DesktopFocusedPreview() {
     RetroTheme {
         val placeholder = rememberVectorPainter(RetroIcons.AppPlaceholder)
         DesktopScreen(LauncherUiState(previewDesktop(FocusState.Focused)), previewActions) { placeholder }
+    }
+}
+
+@Preview(widthDp = 360, heightDp = 640)
+@Composable
+private fun DesktopBlockerOffPreview() {
+    RetroTheme {
+        val placeholder = rememberVectorPainter(RetroIcons.AppPlaceholder)
+        DesktopScreen(
+            LauncherUiState(previewDesktop(FocusState.Focused), blockerOff = true, blockedNotice = true),
+            previewActions,
+        ) { placeholder }
     }
 }
 

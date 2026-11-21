@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import dev.phonefocus.application.AppBlockerStatusSource
 import dev.phonefocus.application.AppCatalogueEntry
 import dev.phonefocus.application.CheckAppLaunch
 import dev.phonefocus.application.ExitCountdown
@@ -13,6 +14,7 @@ import dev.phonefocus.application.ExitCountdownStatus
 import dev.phonefocus.application.FocusCommands
 import dev.phonefocus.application.FocusDesktop
 import dev.phonefocus.application.MakeStricterForm
+import dev.phonefocus.application.ObserveAppBlockerWarning
 import dev.phonefocus.application.ObserveAppCatalogue
 import dev.phonefocus.application.ObserveFocusDesktop
 import dev.phonefocus.domain.AppRule
@@ -21,6 +23,7 @@ import dev.phonefocus.domain.FocusResult
 import dev.phonefocus.domain.FocusState
 import dev.phonefocus.infrastructure.AppContainer
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,6 +78,10 @@ data class LauncherUiState(
     val dialog: LauncherDialog? = null,
     val stricter: MakeStricterUiState = MakeStricterUiState(),
     val exit: ExitUiState = ExitUiState(),
+    /** Focus is on but the app blocker (accessibility service, #11) is off: warn. */
+    val blockerOff: Boolean = false,
+    /** A blocked app was just sent back here: show "Blocked during focus" briefly. */
+    val blockedNotice: Boolean = false,
 ) {
     /** Time left on the exit countdown; null when none runs. */
     val remaining: Duration? get() = countdown?.remaining
@@ -95,6 +102,8 @@ class LauncherViewModel(
     private val launchApp: (packageName: String) -> Boolean,
     observeCatalogue: ObserveAppCatalogue,
     private val exitDelays: List<ExitDelay>,
+    observeBlockerWarning: ObserveAppBlockerWarning,
+    private val blockerStatus: AppBlockerStatusSource,
 ) : ViewModel() {
     private val dialog = MutableStateFlow<LauncherDialog?>(null)
 
@@ -123,10 +132,22 @@ class LauncherViewModel(
             if (state is FocusState.ExitPending) countdownTicks() else flowOf(null)
         }
 
-    private val windows: Flow<Pair<LauncherDialog?, ExitUiState>> = combine(dialog, exitUi, ::Pair)
+    private val blockedNotice = MutableStateFlow(false)
+    private var blockedNoticeJob: Job? = null
+
+    /** Dialog, exit flow and the app blocker's warning and notice. */
+    private data class Windows(
+        val dialog: LauncherDialog?,
+        val exit: ExitUiState,
+        val blockerOff: Boolean,
+        val blockedNotice: Boolean,
+    )
+
+    private val windows: Flow<Windows> =
+        combine(dialog, exitUi, observeBlockerWarning(), blockedNotice, ::Windows)
 
     val state: StateFlow<LauncherUiState> =
-        combine(desktops, countdownStatus, windows, catalogue, stricterEdits) { desktop, countdown, (dialog, exit), apps, edits ->
+        combine(desktops, countdownStatus, windows, catalogue, stricterEdits) { desktop, countdown, windows, apps, edits ->
             val session = desktop?.session
             val form = if (session != null && session.state.isFocusActive && apps != null) {
                 MakeStricterForm.create(apps, session, exitDelays, edits.rules, edits.delay)
@@ -134,7 +155,15 @@ class LauncherViewModel(
                 null
             }
             val stricter = MakeStricterUiState(form, edits.confirming && form?.hasChanges == true, edits.applying, edits.error)
-            LauncherUiState(desktop, countdown, dialog, stricter, exit)
+            LauncherUiState(
+                desktop,
+                countdown,
+                windows.dialog,
+                stricter,
+                windows.exit,
+                blockerOff = windows.blockerOff,
+                blockedNotice = windows.blockedNotice,
+            )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LauncherUiState())
 
     /** The countdown now and then every second; nudges the unlock once it reaches zero. */
@@ -247,6 +276,21 @@ class LauncherViewModel(
         }
     }
 
+    /** A blocked app was sent back to the desktop: show "Blocked during focus" for a moment. */
+    fun showBlockedNotice() {
+        blockedNoticeJob?.cancel()
+        blockedNotice.value = true
+        blockedNoticeJob = viewModelScope.launch {
+            delay(BLOCKED_NOTICE_MS)
+            blockedNotice.value = false
+        }
+    }
+
+    /** Checks again whether the app blocker is on, e.g. when the desktop comes back on screen. */
+    fun refreshBlockerStatus() {
+        blockerStatus.refresh()
+    }
+
     /** Advances time (e.g. when the desktop comes back on screen) so an ended countdown unlocks. */
     fun tick() {
         viewModelScope.launch {
@@ -258,6 +302,7 @@ class LauncherViewModel(
         private const val TAG = "LauncherViewModel"
         private const val STOP_TIMEOUT_MS = 5_000L
         private const val TICK_MS = 1_000L
+        private const val BLOCKED_NOTICE_MS = 2_000L
 
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer {
@@ -269,6 +314,8 @@ class LauncherViewModel(
                     launchApp = container.appLauncher::launch,
                     observeCatalogue = container.observeAppCatalogue,
                     exitDelays = container.exitDelays,
+                    observeBlockerWarning = container.observeAppBlockerWarning,
+                    blockerStatus = container.appBlockerStatus,
                 )
             }
         }
