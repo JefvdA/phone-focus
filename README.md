@@ -90,6 +90,8 @@ Debug builds show a small debug panel with a one-minute exit delay
 
 ## Project layout
 
-Single `app` module, Kotlin + Jetpack Compose, minSdk 34. Code lives under
+Single `app` module, Kotlin + Jetpack Compose, minSdk 33 (Android 13). The target device
+is a Galaxy Z Flip 6; the minimum is 33 so the app can also be tested on a Galaxy Tab S7,
+whose last major update is Android 13. Code lives under
 `app/src/main/kotlin/dev/phonefocus/` in DDD layers: `domain`, `application`,
 `infrastructure`, `ui`. See [CLAUDE.md](CLAUDE.md) for conventions.
