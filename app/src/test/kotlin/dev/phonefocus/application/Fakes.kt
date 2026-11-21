@@ -24,7 +24,7 @@ class FakeRepository(initial: FocusRecord = FocusRecord.INITIAL) : FocusSessionR
 }
 
 /** A device whose wall clock can be changed and which can be rebooted. */
-class FakeDeviceClock(var wallTime: Instant) : DeviceClock {
+class FakeDeviceClock(@Volatile var wallTime: Instant) : DeviceClock {
     var elapsedRealtime: Duration = Duration.ofMinutes(5)
     var bootCount: Int = 1
 
@@ -54,11 +54,13 @@ class FakeScheduler : UnlockScheduler {
     var scheduled: Duration? = null
     val calls = mutableListOf<String>()
 
+    @Synchronized
     override fun scheduleUnlockIn(delay: Duration) {
         scheduled = delay
         calls += "schedule $delay"
     }
 
+    @Synchronized
     override fun cancel() {
         scheduled = null
         calls += "cancel"

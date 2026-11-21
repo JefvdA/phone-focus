@@ -74,4 +74,12 @@ class FocusRecordCodecTest {
         assertEquals(ExitDelay.ONE_DAY, decoded.exitDelay)
         assertEquals(AppPolicy(mapOf("com.app" to AppRule.Blocked, "org.phone" to AppRule.Allowed)), decoded.policy)
     }
+
+    @Test
+    fun `the corruption fallback restores a Focused session, never Unlocked`() {
+        val session = FocusRecordCodec.decode(FocusRecordCodec.corruptionFallback()).session
+        assertEquals(FocusState.Focused, session.state)
+        assertEquals(AppPolicy.EMPTY, session.policy)
+        assertEquals(ExitDelay.ONE_DAY, session.exitDelay)
+    }
 }

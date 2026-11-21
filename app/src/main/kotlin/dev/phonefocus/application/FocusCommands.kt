@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.time.Duration
 import java.time.Instant
 
@@ -25,12 +27,18 @@ class ObserveFocusSession(private val repository: FocusSessionRepository) {
  * Runs domain commands against the persisted session: loads the record, applies the command
  * atomically with the current trusted time ([TrustedTime]), persists the result and keeps the
  * scheduled unlock in sync. A rejected command changes nothing.
+ *
+ * Whole commands (clock reading, update and alarm sync) run one at a time under [mutex], so a
+ * reading is never older than the checkpoint it is compared with, and a slower command cannot
+ * cancel or replace the alarm a later one scheduled. Use one instance per process.
  */
 class FocusCommands(
     private val repository: FocusSessionRepository,
     private val clock: DeviceClock,
     private val scheduler: UnlockScheduler,
 ) {
+    private val mutex = Mutex()
+
     /** Unlocked -> Focused. */
     suspend fun startFocus(policy: AppPolicy, delay: ExitDelay): FocusResult =
         apply { session, _ -> session.startFocus(policy, delay) }
@@ -49,20 +57,20 @@ class FocusCommands(
      * checkpoint and re-schedules the unlock. Safe to call any time; run it on app start, boot,
      * screen-on, shutdown and when the unlock alarm fires.
      */
-    suspend fun tick(): FocusSession {
-        val reading = clock.read()
+    suspend fun tick(): FocusSession = mutex.withLock {
         val record = repository.update { record ->
+            val reading = clock.read()
             val now = TrustedTime.now(reading, record.checkpoint)
             withCheckpoint(record.session.tick(now), reading, now)
         }
         syncUnlockAlarm(record)
-        return record.session
+        record.session
     }
 
-    private suspend fun apply(command: (FocusSession, Instant) -> FocusResult): FocusResult {
-        val reading = clock.read()
+    private suspend fun apply(command: (FocusSession, Instant) -> FocusResult): FocusResult = mutex.withLock {
         lateinit var result: FocusResult
         val record = repository.update { record ->
+            val reading = clock.read()
             val now = TrustedTime.now(reading, record.checkpoint)
             result = command(record.session, now)
             when (val r = result) {
@@ -71,7 +79,7 @@ class FocusCommands(
             }
         }
         if (result is FocusResult.Success) syncUnlockAlarm(record)
-        return result
+        result
     }
 
     /** [session] with a checkpoint at [now] while its countdown runs, without one otherwise. */

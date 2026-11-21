@@ -8,7 +8,10 @@ import dev.phonefocus.domain.FocusResult
 import dev.phonefocus.domain.FocusSession
 import dev.phonefocus.domain.FocusState
 import dev.phonefocus.domain.Tightening
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -217,5 +220,41 @@ class FocusCommandsTest {
         commands.tick()
         assertEquals(t0 + Duration.ofHours(12), record.checkpoint?.trustedTime)
         assertEquals(Duration.ofHours(12), scheduler.scheduled)
+    }
+
+    // --- concurrency (review on #17) -------------------------------------------------------
+
+    @Test
+    fun `a stale clock reading from a concurrent tick does not unlock early`() = runBlocking {
+        clock.elapsedRealtime = Duration.ofDays(3)
+        exitPending()
+        val staleReading = clock.read()
+        clock.advance(Duration.ofMillis(5))
+        commands.tick() // writes a checkpoint at a later elapsedRealtime
+        val staleCommands = FocusCommands(repo, { staleReading }, scheduler)
+        assertEquals(FocusState.ExitPending(t0 + day), staleCommands.tick().state)
+        assertEquals(FocusState.ExitPending(t0 + day), state)
+        assertEquals(t0 + Duration.ofMillis(5), record.checkpoint?.trustedTime)
+    }
+
+    @Test
+    fun `concurrent commands leave the alarm in sync with the stored session`() = runBlocking {
+        focused()
+        repeat(20) { round ->
+            coroutineScope {
+                repeat(30) { i ->
+                    launch(Dispatchers.Default) {
+                        when ((i + round) % 3) {
+                            0 -> commands.tick()
+                            1 -> commands.requestExit()
+                            else -> commands.cancelExit()
+                        }
+                    }
+                }
+            }
+            val pending = state is FocusState.ExitPending
+            assertEquals("round $round: $record / ${scheduler.scheduled}", pending, scheduler.scheduled != null)
+            assertEquals(pending, record.checkpoint != null)
+        }
     }
 }

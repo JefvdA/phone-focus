@@ -19,14 +19,25 @@ import java.time.Instant
  * off by that time. Time settings stay changeable until Device Owner (#14) locks them.
  */
 object TrustedTime {
+    /** The boot count a [DeviceClock] reports when the device does not provide one. */
+    const val UNKNOWN_BOOT_COUNT: Int = -1
+
     /** The current trusted time for [reading], measured from [checkpoint] when there is one. */
     fun now(reading: ClockReading, checkpoint: TimeCheckpoint?): Instant {
         if (checkpoint == null) return reading.wallTime
-        val sameBoot = reading.bootCount == checkpoint.bootCount &&
-            reading.elapsedRealtime >= checkpoint.elapsedRealtime
-        val elapsedSinceCheckpoint: Duration =
-            if (sameBoot) reading.elapsedRealtime - checkpoint.elapsedRealtime else reading.elapsedRealtime
-        return checkpoint.trustedTime + elapsedSinceCheckpoint.coerceAtLeast(Duration.ZERO)
+        val sinceCheckpoint = reading.elapsedRealtime - checkpoint.elapsedRealtime
+        val bootCountKnown = reading.bootCount != UNKNOWN_BOOT_COUNT &&
+            checkpoint.bootCount != UNKNOWN_BOOT_COUNT
+        val rebooted = if (bootCountKnown) {
+            reading.bootCount != checkpoint.bootCount
+        } else {
+            // Without a boot count, the monotonic clock going back is the only reboot signal.
+            sinceCheckpoint.isNegative
+        }
+        // Same boot but an older reading than the checkpoint (a stale, concurrent reading):
+        // count no time at all rather than mistaking it for a reboot.
+        val elapsed: Duration = if (rebooted) reading.elapsedRealtime else sinceCheckpoint
+        return checkpoint.trustedTime + elapsed.coerceAtLeast(Duration.ZERO)
     }
 
     /** A checkpoint saying that at [reading] the trusted time was [trustedTime]. */

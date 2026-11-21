@@ -34,9 +34,24 @@ class TrustedTimeTest {
     }
 
     @Test
-    fun `a monotonic clock that went back is treated as a reboot even with the same boot count`() {
-        val reading = ClockReading(t0, Duration.ofMinutes(2), 3)
-        assertEquals(t0.plus(Duration.ofMinutes(2)), TrustedTime.now(reading, checkpoint))
+    fun `a stale reading from the same known boot counts no time, it is not a reboot`() {
+        val reading = ClockReading(t0.plus(Duration.ofDays(30)), Duration.ofMinutes(59), 3)
+        assertEquals(t0, TrustedTime.now(reading, checkpoint))
+    }
+
+    @Test
+    fun `without a boot count a monotonic clock that went back is treated as a reboot`() {
+        val unknown = TrustedTime.UNKNOWN_BOOT_COUNT
+        val cp = checkpoint.copy(bootCount = unknown)
+        assertEquals(t0.plus(Duration.ofMinutes(2)), TrustedTime.now(ClockReading(t0, Duration.ofMinutes(2), unknown), cp))
+        assertEquals(t0.plus(Duration.ofHours(1)), TrustedTime.now(ClockReading(t0, Duration.ofHours(2), unknown), cp))
+    }
+
+    @Test
+    fun `a known boot count on one side only falls back to the monotonic clock check`() {
+        val reading = ClockReading(t0, Duration.ofHours(2), 3)
+        val cp = checkpoint.copy(bootCount = TrustedTime.UNKNOWN_BOOT_COUNT)
+        assertEquals(t0.plus(Duration.ofHours(1)), TrustedTime.now(reading, cp))
     }
 
     @Test

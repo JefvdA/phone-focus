@@ -3,6 +3,7 @@ package dev.phonefocus.infrastructure.persistence
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import dev.phonefocus.application.FocusRecord
@@ -60,6 +61,12 @@ object FocusRecordCodec {
             into[CHECKPOINT_BOOT_COUNT] = it.bootCount
         }
     }
+
+    /**
+     * What replaces a corrupt DataStore file: a Focused session with an empty policy (everything
+     * blocked) and the default delay. Fails closed: corruption never unlocks the phone.
+     */
+    fun corruptionFallback(): Preferences = mutablePreferencesOf(VERSION to SCHEMA_VERSION, STATE to FOCUSED)
 
     fun decode(prefs: Preferences): FocusRecord {
         val stateName = prefs[STATE] ?: return FocusRecord.INITIAL
