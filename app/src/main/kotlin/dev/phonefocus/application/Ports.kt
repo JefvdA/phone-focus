@@ -1,5 +1,6 @@
 package dev.phonefocus.application
 
+import dev.phonefocus.domain.EssentialApps
 import kotlinx.coroutines.flow.Flow
 import java.time.Duration
 
@@ -30,4 +31,19 @@ interface UnlockScheduler {
 
     /** Cancels the scheduled unlock, if any. */
     fun cancel()
+}
+
+/** The installed apps that have a launcher entry. Implemented in `infrastructure`. */
+interface InstalledAppsSource {
+    /** The current apps, re-emitted whenever an app is installed, removed, updated or changed. */
+    val apps: Flow<List<InstalledApp>>
+}
+
+/**
+ * Resolves the device's [EssentialApps] (this app, Settings, the default dialer). Implemented in
+ * `infrastructure`.
+ */
+interface EssentialAppsSource {
+    /** The current essential apps, re-emitted when they may have changed (e.g. a new default dialer). */
+    val essentialApps: Flow<EssentialApps>
 }
