@@ -29,7 +29,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 PlaceholderScreen(AppVersion.describe(versionName)) {
-                    if (container.isDebugBuild) DebugFocusPanel(container)
+                    if (container.isDebugBuild) {
+                        DebugFocusPanel(container)
+                        DebugAppCatalogue(container)
+                    }
                 }
             }
         }
