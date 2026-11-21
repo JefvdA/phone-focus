@@ -4,10 +4,13 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.preferencesDataStore
+import dev.phonefocus.application.AppBlockerStatusSource
 import dev.phonefocus.application.CheckAppLaunch
 import dev.phonefocus.application.ExitCountdown
 import dev.phonefocus.application.ExitDelayOptions
 import dev.phonefocus.application.FocusCommands
+import dev.phonefocus.application.ObserveAppBlockerWarning
+import dev.phonefocus.application.ObserveAppBlocking
 import dev.phonefocus.application.ObserveAppCatalogue
 import dev.phonefocus.application.ObserveFocusDesktop
 import dev.phonefocus.application.ObserveFocusSession
@@ -19,8 +22,10 @@ import dev.phonefocus.infrastructure.apps.AppLauncher
 import dev.phonefocus.infrastructure.apps.PackageManagerAppCatalogue
 import dev.phonefocus.infrastructure.persistence.DataStoreFocusSessionRepository
 import dev.phonefocus.infrastructure.persistence.FocusRecordCodec
+import dev.phonefocus.infrastructure.system.AndroidAppBlockerStatus
 import dev.phonefocus.infrastructure.system.AndroidFocusNotifier
 import dev.phonefocus.infrastructure.system.AndroidStartPrerequisites
+import dev.phonefocus.infrastructure.system.AndroidSystemPackages
 import dev.phonefocus.infrastructure.time.AlarmUnlockScheduler
 import dev.phonefocus.infrastructure.time.AndroidDeviceClock
 import kotlinx.coroutines.CoroutineScope
@@ -74,4 +79,16 @@ class AppContainer(context: Context) {
     val startPrerequisites: StartPrerequisites = AndroidStartPrerequisites(appContext)
 
     val startFocusFromSetup = StartFocusFromSetup(commands, startPrerequisites)
+
+    /** What the app blocker (accessibility service, #11) judges the app in front with. */
+    val observeAppBlocking = ObserveAppBlocking(
+        observeSession,
+        appCatalogue,
+        AndroidSystemPackages(appContext, scope),
+        appCatalogue,
+    )
+
+    val appBlockerStatus: AppBlockerStatusSource = AndroidAppBlockerStatus(appContext, startPrerequisites)
+
+    val observeAppBlockerWarning = ObserveAppBlockerWarning(observeSession, appBlockerStatus)
 }
