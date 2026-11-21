@@ -48,6 +48,8 @@ import dev.phonefocus.ui.theme.retroBevel
 /**
  * 90s drop-down list: a sunken field showing the [selected] option with a raised arrow button.
  * Tapping opens a list of [options] right below it; the selected option is shown in navy.
+ * Options for which [isHighlighted] is true (e.g. "No short videos") are drawn on pale yellow,
+ * in the list and in the field while selected.
  */
 @Composable
 fun <T> RetroDropdown(
@@ -57,6 +59,7 @@ fun <T> RetroDropdown(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     optionLabel: (T) -> String = { it.toString() },
+    isHighlighted: (T) -> Boolean = { false },
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     var fieldWidth by remember { mutableIntStateOf(0) }
@@ -70,7 +73,11 @@ fun <T> RetroDropdown(
                 .defaultMinSize(minHeight = RetroDimens.FieldMinHeight)
                 .onSizeChanged { fieldWidth = it.width; fieldHeight = it.height }
                 .clickable(enabled = enabled, role = Role.DropdownList) { expanded = true },
-            background = if (enabled) RetroColors.Field else RetroColors.Surface,
+            background = when {
+                !enabled -> RetroColors.Surface
+                isHighlighted(selected) -> RetroColors.Highlight
+                else -> RetroColors.Field
+            },
         ) {
             Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -105,6 +112,7 @@ fun <T> RetroDropdown(
                     options = options,
                     selected = selected,
                     optionLabel = optionLabel,
+                    isHighlighted = isHighlighted,
                     onSelect = { expanded = false; onSelect(it) },
                     modifier = Modifier.width(with(density) { fieldWidth.toDp() }),
                 )
@@ -121,6 +129,7 @@ internal fun <T> RetroDropdownList(
     optionLabel: (T) -> String,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
+    isHighlighted: (T) -> Boolean = { false },
 ) {
     Column(
         modifier
@@ -134,7 +143,13 @@ internal fun <T> RetroDropdownList(
                 Modifier
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = RetroDimens.DropdownItemMinHeight)
-                    .background(if (isSelected) RetroColors.TitleBar else RetroColors.Field)
+                    .background(
+                        when {
+                            isSelected -> RetroColors.TitleBar
+                            isHighlighted(option) -> RetroColors.Highlight
+                            else -> RetroColors.Field
+                        },
+                    )
                     .semantics { this.selected = isSelected }
                     .clickable { onSelect(option) }
                     .padding(horizontal = 6.dp),
