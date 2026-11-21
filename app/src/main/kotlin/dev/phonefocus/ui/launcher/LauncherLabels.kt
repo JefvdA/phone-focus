@@ -20,6 +20,17 @@ internal object LauncherLabels {
 
     const val FOCUS_ON = "Focus mode is on."
 
+    // --- App blocker (#11) -------------------------------------------------------------------
+
+    /** The short notice after a blocked app was sent back to the desktop. */
+    const val BLOCKED_NOTICE = "Blocked during focus"
+
+    const val BLOCKER_OFF_TITLE = "App blocker is off"
+
+    const val BLOCKER_OFF =
+        "Blocked apps can be opened: the Phone Focus accessibility service was turned off. " +
+            "Turn it back on in Accessibility settings."
+
     // --- Emergency escape and exit pending (C5, #10) ----------------------------------------
 
     /** Before `requestExit`, with the session's actual delay, e.g. "The phone unlocks in 24 hours." */

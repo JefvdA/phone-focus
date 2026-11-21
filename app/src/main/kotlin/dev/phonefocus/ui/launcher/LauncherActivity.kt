@@ -17,6 +17,7 @@ import dev.phonefocus.application.StartPrerequisite
 import dev.phonefocus.infrastructure.AppContainer
 import dev.phonefocus.infrastructure.PhoneFocusApp
 import dev.phonefocus.infrastructure.system.AndroidStartPrerequisites
+import dev.phonefocus.infrastructure.system.FocusAccessibilityService
 import dev.phonefocus.ui.MainActivity
 import dev.phonefocus.ui.rememberAppIconPainter
 import dev.phonefocus.ui.theme.RetroTheme
@@ -33,6 +34,7 @@ class LauncherActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (savedInstanceState == null) showNoticeIfBlocked(intent)
         // A home screen has nothing to go back to: back only closes a window.
         onBackPressedDispatcher.addCallback(this) { viewModel.closeDialog() }
         val icons = container.appIcons
@@ -42,6 +44,8 @@ class LauncherActivity : ComponentActivity() {
                 LifecycleResumeEffect(Unit) {
                     // An ended countdown unlocks even if the alarm was late.
                     viewModel.tick()
+                    // The app blocker may have been turned off while the desktop was away.
+                    viewModel.refreshBlockerStatus()
                     onPauseOrDispose {}
                 }
                 val actions = remember {
@@ -51,6 +55,7 @@ class LauncherActivity : ComponentActivity() {
                         onCloseDialog = viewModel::closeDialog,
                         onOpenSetup = ::openSetup,
                         onSwitchHomeBack = ::openHomeSettings,
+                        onOpenBlockerSettings = ::openAccessibilitySettings,
                         stricter = MakeStricterActions(
                             onRuleChange = viewModel::setStricterRule,
                             onExitDelayChange = viewModel::setStricterDelay,
@@ -72,6 +77,14 @@ class LauncherActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         viewModel.closeDialog()
+        showNoticeIfBlocked(intent)
+    }
+
+    /** Sent back here by the app blocker (#11): say why. */
+    private fun showNoticeIfBlocked(intent: Intent?) {
+        if (intent?.getBooleanExtra(FocusAccessibilityService.EXTRA_BLOCKED, false) == true) {
+            viewModel.showBlockedNotice()
+        }
     }
 
     private fun openSetup() {
@@ -79,11 +92,15 @@ class LauncherActivity : ComponentActivity() {
         startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
-    private fun openHomeSettings() {
+    private fun openHomeSettings() = openSettings(StartPrerequisite.DefaultHome)
+
+    private fun openAccessibilitySettings() = openSettings(StartPrerequisite.AccessibilityService)
+
+    private fun openSettings(prerequisite: StartPrerequisite) {
         try {
-            startActivity(AndroidStartPrerequisites.settingsIntent(StartPrerequisite.DefaultHome))
+            startActivity(AndroidStartPrerequisites.settingsIntent(prerequisite))
         } catch (e: ActivityNotFoundException) {
-            Log.w("LauncherActivity", "no default home settings", e)
+            Log.w("LauncherActivity", "no settings screen for $prerequisite", e)
         }
     }
 }

@@ -26,7 +26,9 @@ internal object SetupLabels {
         StartPrerequisite.DefaultHome ->
             "Set Phone Focus as the default home app, so focus mode replaces the home screen."
         StartPrerequisite.AccessibilityService ->
-            "Turn on the Phone Focus accessibility service, so blocked apps and short videos are closed."
+            "Turn on the Phone Focus app blocker in Accessibility settings. During focus it checks " +
+                "which app is in front and sends you back to the focus desktop when it is a blocked " +
+                "app. It reads nothing else; the phone, Settings and the keyboard are never blocked."
     }
 
     fun confirmation(delay: ExitDelay): String =
