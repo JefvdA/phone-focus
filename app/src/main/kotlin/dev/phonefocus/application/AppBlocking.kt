@@ -78,6 +78,25 @@ class ObserveAppBlocking(
         }.distinctUntilChanged()
 }
 
+/** An application window on screen, as the app blocker sees it. */
+data class ForegroundWindow(
+    val packageName: String,
+    /** A picture-in-picture window: relaunching the desktop does not remove it. */
+    val pictureInPicture: Boolean = false,
+    /**
+     * On the main display. Windows on other displays (the Flip's cover screen) are not judged
+     * yet: the desktop can only be brought back on the main display, so bouncing them would loop.
+     */
+    val defaultDisplay: Boolean = true,
+)
+
+/** What is on screen when the app blocker looks, see [EvaluateForegroundApp]. */
+data class ForegroundScreen(
+    val windows: List<ForegroundWindow>,
+    /** The focus desktop (this app) has the active window on the main display. */
+    val desktopInFront: Boolean = false,
+)
+
 /** What the app blocker does about the apps in front, see [EvaluateForegroundApp]. */
 sealed interface ForegroundAction {
     /** Leave it. */
@@ -86,44 +105,72 @@ sealed interface ForegroundAction {
     /** Send the user back to the focus desktop and say why. */
     data class Bounce(val packageName: String) : ForegroundAction
 
+    /** Close the picture-in-picture window of a blocked app (bouncing can't remove it). */
+    data class DismissPictureInPicture(val packageName: String) : ForegroundAction
+
     /**
-     * A bounce for the same app was just sent: don't send another yet, but look at the screen
-     * again in [delayMillis], in case the app is still (or again) in front.
+     * Nothing to do right now, but look at the screen again in [delayMillis]: a bounce or
+     * dismissal for the app was just sent, or the window list may still be settling.
      */
     data class RecheckIn(val delayMillis: Long) : ForegroundAction
 }
 
 /**
- * Decides what to do when the apps in front change (#11): bounce a [ForegroundVerdict.Blocked]
- * one back to the focus desktop, at most once per [debounceMillis] per app.
+ * Decides what to do when the apps on screen change (#11). Only windows on the main display
+ * are judged, and only [ForegroundVerdict.Blocked] ones are acted on:
  *
- * Opening an app fires a burst of window events; without the debounce each would start the
- * desktop again and show another notice. A suppressed bounce asks for a recheck when the
- * debounce ends, so an app that is still or again in front is bounced then (well within ~1s)
- * instead of staying open until the next window event.
+ * - A blocked full-screen (or split-screen) app is bounced back to the focus desktop, at most
+ *   once per [debounceMillis] per app. Opening an app fires a burst of window events; without
+ *   the debounce each would start the desktop again. A suppressed bounce asks for a recheck
+ *   when the debounce ends, so an app that is still or again in front is bounced then (well
+ *   within ~1s).
+ * - The desktop is never restarted while it is already in front (a blocked window still listed
+ *   then is a stale entry from the transition): only a recheck is asked for, so open desktop
+ *   dialogs stay usable.
+ * - A blocked picture-in-picture window is dismissed instead, at most once per [debounceMillis]
+ *   per app; it never restarts the desktop, so a PiP that refuses to close cannot cause a loop.
  *
- * Holds the time of the last bounce, so use one instance per service. Times are monotonic
+ * Holds the times of the last actions, so use one instance per service. Times are monotonic
  * milliseconds passed in by the caller.
  */
 class EvaluateForegroundApp(private val debounceMillis: Long = DEFAULT_DEBOUNCE_MILLIS) {
-    private var lastBounce: Pair<String, Long>? = null
+    private val lastBounce = mutableMapOf<String, Long>()
+    private val lastDismiss = mutableMapOf<String, Long>()
 
     /**
-     * What to do now that [packages] are in front (several in split screen or pop-up view), at
-     * [nowMillis]. While [context] is not known yet (just started) nothing can be judged, so a
-     * recheck is asked for.
+     * What to do now that [screen] is showing, at [nowMillis]. While [context] is not known yet
+     * (just started) nothing can be judged, so a recheck is asked for.
      */
     @Synchronized
-    operator fun invoke(context: AppBlockingContext?, packages: Collection<String>, nowMillis: Long): ForegroundAction {
-        if (context == null) return if (packages.isEmpty()) ForegroundAction.None else ForegroundAction.RecheckIn(debounceMillis)
-        val blocked = packages.firstOrNull { context.verdict(it).bounces } ?: return ForegroundAction.None
-        val last = lastBounce
-        if (last != null && last.first == blocked) {
-            val elapsed = nowMillis - last.second
-            if (elapsed in 0 until debounceMillis) return ForegroundAction.RecheckIn(debounceMillis - elapsed)
+    operator fun invoke(context: AppBlockingContext?, screen: ForegroundScreen, nowMillis: Long): ForegroundAction {
+        val judged = screen.windows.filter { it.defaultDisplay }
+        if (context == null) return if (judged.isEmpty()) ForegroundAction.None else ForegroundAction.RecheckIn(debounceMillis)
+        val blocked = judged.filter { context.verdict(it.packageName).bounces }
+        val fullScreen = blocked.firstOrNull { !it.pictureInPicture }
+        val pip = blocked.firstOrNull { it.pictureInPicture }
+        return when {
+            fullScreen != null && screen.desktopInFront -> ForegroundAction.RecheckIn(debounceMillis)
+            fullScreen != null -> throttled(lastBounce, fullScreen.packageName, nowMillis) {
+                ForegroundAction.Bounce(fullScreen.packageName)
+            }
+            pip != null -> throttled(lastDismiss, pip.packageName, nowMillis) {
+                ForegroundAction.DismissPictureInPicture(pip.packageName)
+            }
+            else -> ForegroundAction.None
         }
-        lastBounce = blocked to nowMillis
-        return ForegroundAction.Bounce(blocked)
+    }
+
+    /** [action] unless it was done for [packageName] less than [debounceMillis] ago; then a recheck. */
+    private fun throttled(
+        last: MutableMap<String, Long>,
+        packageName: String,
+        nowMillis: Long,
+        action: () -> ForegroundAction,
+    ): ForegroundAction {
+        val elapsed = last[packageName]?.let { nowMillis - it }
+        if (elapsed != null && elapsed in 0 until debounceMillis) return ForegroundAction.RecheckIn(debounceMillis - elapsed)
+        last[packageName] = nowMillis
+        return action()
     }
 
     companion object {

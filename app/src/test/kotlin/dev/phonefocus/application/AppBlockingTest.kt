@@ -103,60 +103,125 @@ class AppBlockingTest {
 
     // --- EvaluateForegroundApp ------------------------------------------------------------
 
+    private fun screen(vararg packages: String, desktopInFront: Boolean = false) =
+        ForegroundScreen(packages.map { ForegroundWindow(it) }, desktopInFront)
+
+    private fun pip(packageName: String) = ForegroundWindow(packageName, pictureInPicture = true)
+
+    private fun cover(packageName: String) = ForegroundWindow(packageName, defaultDisplay = false)
+
     @Test
     fun `bounces a blocked app in front`() {
         val evaluate = EvaluateForegroundApp(debounceMillis = 500)
-        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), listOf(youtube), 1_000))
+        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), screen(youtube), 1_000))
     }
 
     @Test
     fun `leaves allowed, essential, system and unlocked apps alone`() {
         val evaluate = EvaluateForegroundApp(debounceMillis = 500)
-        assertEquals(ForegroundAction.None, evaluate(context(), listOf(whatsapp, self, "com.android.systemui"), 1_000))
-        assertEquals(ForegroundAction.None, evaluate(context(FocusSession.initial()), listOf(youtube), 1_000))
-        assertEquals(ForegroundAction.None, evaluate(context(), emptyList(), 1_000))
+        assertEquals(ForegroundAction.None, evaluate(context(), screen(whatsapp, self, "com.android.systemui"), 1_000))
+        assertEquals(ForegroundAction.None, evaluate(context(FocusSession.initial()), screen(youtube), 1_000))
+        assertEquals(ForegroundAction.None, evaluate(context(), screen(), 1_000))
     }
 
     @Test
     fun `bounces when any app in split screen is blocked`() {
         val evaluate = EvaluateForegroundApp(debounceMillis = 500)
-        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), listOf(whatsapp, youtube), 1_000))
+        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), screen(whatsapp, youtube), 1_000))
     }
 
     @Test
     fun `repeated events for the same app within the debounce ask for a recheck instead of bouncing again`() {
         val evaluate = EvaluateForegroundApp(debounceMillis = 500)
-        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), listOf(youtube), 1_000))
-        assertEquals(ForegroundAction.RecheckIn(400), evaluate(context(), listOf(youtube), 1_100))
-        assertEquals(ForegroundAction.RecheckIn(1), evaluate(context(), listOf(youtube), 1_499))
+        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), screen(youtube), 1_000))
+        assertEquals(ForegroundAction.RecheckIn(400), evaluate(context(), screen(youtube), 1_100))
+        assertEquals(ForegroundAction.RecheckIn(1), evaluate(context(), screen(youtube), 1_499))
     }
 
     @Test
     fun `bounces the same app again once the debounce is over`() {
         val evaluate = EvaluateForegroundApp(debounceMillis = 500)
-        evaluate(context(), listOf(youtube), 1_000)
-        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), listOf(youtube), 1_500))
+        evaluate(context(), screen(youtube), 1_000)
+        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), screen(youtube), 1_500))
     }
 
     @Test
     fun `a different blocked app bounces at once`() {
         val evaluate = EvaluateForegroundApp(debounceMillis = 500)
-        evaluate(context(), listOf(youtube), 1_000)
-        assertEquals(ForegroundAction.Bounce(newApp), evaluate(context(), listOf(newApp), 1_100))
+        evaluate(context(), screen(youtube), 1_000)
+        assertEquals(ForegroundAction.Bounce(newApp), evaluate(context(), screen(newApp), 1_100))
     }
 
     @Test
     fun `a clock going backwards does not suppress bounces`() {
         val evaluate = EvaluateForegroundApp(debounceMillis = 500)
-        evaluate(context(), listOf(youtube), 1_000)
-        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), listOf(youtube), 900))
+        evaluate(context(), screen(youtube), 1_000)
+        assertEquals(ForegroundAction.Bounce(youtube), evaluate(context(), screen(youtube), 900))
     }
 
     @Test
     fun `without a context yet it asks for a recheck`() {
         val evaluate = EvaluateForegroundApp(debounceMillis = 500)
-        assertEquals(ForegroundAction.RecheckIn(500), evaluate(null, listOf(youtube), 1_000))
-        assertEquals(ForegroundAction.None, evaluate(null, emptyList(), 1_000))
+        assertEquals(ForegroundAction.RecheckIn(500), evaluate(null, screen(youtube), 1_000))
+        assertEquals(ForegroundAction.None, evaluate(null, screen(), 1_000))
+    }
+
+    @Test
+    fun `a blocked app that keeps reappearing is bounced once per debounce, with rechecks in between`() {
+        val evaluate = EvaluateForegroundApp(debounceMillis = 500)
+        val actions = (0L..1_500L step 100).map { t -> evaluate(context(), screen(youtube), 1_000 + t) }
+        assertEquals(4, actions.count { it is ForegroundAction.Bounce })
+        assertTrue(actions.all { it is ForegroundAction.Bounce || it is ForegroundAction.RecheckIn })
+    }
+
+    @Test
+    fun `never restarts the desktop while it is in front, only rechecks`() {
+        val evaluate = EvaluateForegroundApp(debounceMillis = 500)
+        repeat(10) { i ->
+            assertEquals(
+                ForegroundAction.RecheckIn(500),
+                evaluate(context(), screen(self, youtube, desktopInFront = true), 1_000L + i * 600),
+            )
+        }
+    }
+
+    @Test
+    fun `a blocked picture-in-picture window is dismissed, not bounced`() {
+        val evaluate = EvaluateForegroundApp(debounceMillis = 500)
+        val screen = ForegroundScreen(listOf(ForegroundWindow(self), pip(youtube)), desktopInFront = true)
+        assertEquals(ForegroundAction.DismissPictureInPicture(youtube), evaluate(context(), screen, 1_000))
+    }
+
+    @Test
+    fun `a picture-in-picture window that stays never restarts the desktop`() {
+        val evaluate = EvaluateForegroundApp(debounceMillis = 500)
+        val screen = ForegroundScreen(listOf(ForegroundWindow(self), pip(youtube)), desktopInFront = true)
+        val actions = (0L..3_000L step 100).map { t -> evaluate(context(), screen, 1_000 + t) }
+        assertTrue(actions.none { it is ForegroundAction.Bounce })
+        assertEquals(7, actions.count { it is ForegroundAction.DismissPictureInPicture })
+    }
+
+    @Test
+    fun `allowed picture-in-picture windows are left alone`() {
+        val evaluate = EvaluateForegroundApp(debounceMillis = 500)
+        assertEquals(ForegroundAction.None, evaluate(context(), ForegroundScreen(listOf(pip(whatsapp))), 1_000))
+    }
+
+    @Test
+    fun `a blocked full-screen app is bounced before a blocked picture-in-picture is dismissed`() {
+        val evaluate = EvaluateForegroundApp(debounceMillis = 500)
+        val screen = ForegroundScreen(listOf(pip(youtube), ForegroundWindow(newApp)))
+        assertEquals(ForegroundAction.Bounce(newApp), evaluate(context(), screen, 1_000))
+        assertEquals(ForegroundAction.DismissPictureInPicture(youtube), evaluate(context(), ForegroundScreen(listOf(pip(youtube))), 1_100))
+    }
+
+    @Test
+    fun `windows on another display (cover screen) are not judged, so they cannot loop`() {
+        val evaluate = EvaluateForegroundApp(debounceMillis = 500)
+        assertEquals(ForegroundAction.None, evaluate(context(), ForegroundScreen(listOf(cover(youtube))), 1_000))
+        assertEquals(ForegroundAction.None, evaluate(null, ForegroundScreen(listOf(cover(youtube))), 1_000))
+        val mixed = ForegroundScreen(listOf(cover(youtube), ForegroundWindow(newApp)))
+        assertEquals(ForegroundAction.Bounce(newApp), evaluate(context(), mixed, 1_000))
     }
 
     // --- ObserveAppBlocking / warning -----------------------------------------------------

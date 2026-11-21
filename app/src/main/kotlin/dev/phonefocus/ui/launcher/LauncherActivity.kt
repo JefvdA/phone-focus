@@ -76,15 +76,15 @@ class LauncherActivity : ComponentActivity() {
     /** Home pressed while the desktop is in front: show the plain desktop. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        viewModel.closeDialog()
-        showNoticeIfBlocked(intent)
+        // A bounce from the app blocker is not the user pressing Home: keep open windows.
+        if (!showNoticeIfBlocked(intent)) viewModel.closeDialog()
     }
 
-    /** Sent back here by the app blocker (#11): say why. */
-    private fun showNoticeIfBlocked(intent: Intent?) {
-        if (intent?.getBooleanExtra(FocusAccessibilityService.EXTRA_BLOCKED, false) == true) {
-            viewModel.showBlockedNotice()
-        }
+    /** Sent back here by the app blocker (#11): say why. True when it was a bounce. */
+    private fun showNoticeIfBlocked(intent: Intent?): Boolean {
+        val blocked = intent?.getBooleanExtra(FocusAccessibilityService.EXTRA_BLOCKED, false) == true
+        if (blocked) viewModel.showBlockedNotice()
+        return blocked
     }
 
     private fun openSetup() {
