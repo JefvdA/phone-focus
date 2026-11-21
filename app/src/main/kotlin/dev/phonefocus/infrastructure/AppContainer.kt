@@ -26,6 +26,7 @@ import dev.phonefocus.infrastructure.system.AndroidAppBlockerStatus
 import dev.phonefocus.infrastructure.system.AndroidFocusNotifier
 import dev.phonefocus.infrastructure.system.AndroidStartPrerequisites
 import dev.phonefocus.infrastructure.system.AndroidSystemPackages
+import dev.phonefocus.infrastructure.system.ScreenTreeDebug
 import dev.phonefocus.infrastructure.time.AlarmUnlockScheduler
 import dev.phonefocus.infrastructure.time.AndroidDeviceClock
 import kotlinx.coroutines.CoroutineScope
@@ -87,6 +88,9 @@ class AppContainer(context: Context) {
         AndroidSystemPackages(appContext, scope),
         appCatalogue,
     )
+
+    /** Debug builds: the screen tree dump of the app blocker, for finding short-video ids (#12). */
+    val screenTreeDebug = ScreenTreeDebug(available = isDebugBuild)
 
     val appBlockerStatus: AppBlockerStatusSource = AndroidAppBlockerStatus(appContext, startPrerequisites)
 

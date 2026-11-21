@@ -3,6 +3,6 @@
 
     <!-- Accessibility service (#11), shown in the system Accessibility settings. -->
     <string name="accessibility_service_label">Phone Focus app blocker</string>
-    <string name="accessibility_service_summary">Closes blocked apps while focus mode is on.</string>
-    <string name="accessibility_service_description">While focus mode is on, Phone Focus checks which app is in front. When it is an app you blocked, or one you did not allow, it sends you back to the focus desktop. The phone, emergency calls, Settings, the keyboard and the system screens are never blocked.\n\nOnly the name of the app in front is used: no screen content or typing is read, stored or sent anywhere. When focus mode is off, nothing is blocked.\n\nIf you turn this off, apps are no longer blocked and the focus desktop shows a warning.</string>
+    <string name="accessibility_service_summary">Closes blocked apps and short videos while focus mode is on.</string>
+    <string name="accessibility_service_description">While focus mode is on, Phone Focus checks which app is in front. When it is an app you blocked, or one you did not allow, it sends you back to the focus desktop. The phone, emergency calls, Settings, the keyboard and the system screens are never blocked.\n\nFor apps you set to "No short videos" (Instagram Reels, YouTube Shorts), it also checks the screen\'s layout identifiers (view ids and labels such as the "Reels" tab) to recognise a short-video screen, and then goes back. Nothing you read or type is used, and nothing is stored or sent anywhere. When focus mode is off, nothing is blocked.\n\nIf you turn this off, apps are no longer blocked and the focus desktop shows a warning.</string>
 </resources>

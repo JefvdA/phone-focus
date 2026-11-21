@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
  * Debug builds only, behind the "Debug…" button of the setup screen: shows the persisted focus
  * state and the start prerequisites, and drives the session with the one-minute debug delay
  * (manual reboot test in #4). "Request exit" / "Cancel exit" stand in for the launcher's
- * escape flow until #8 / #10 exist.
+ * escape flow until #8 / #10 exist. Also hosts the screen tree dump for short-video ids (#12).
  */
 @Composable
 fun DebugFocusPanel(
@@ -60,5 +60,6 @@ fun DebugFocusPanel(
         }) { Text("Start focus (empty policy, 1 min delay)") }
         Button(onClick = { scope.launch { commands.requestExit() } }) { Text("Request exit") }
         Button(onClick = { scope.launch { commands.cancelExit() } }) { Text("Cancel exit") }
+        DebugScreenTreePanel(container.screenTreeDebug)
     }
 }
