@@ -74,3 +74,14 @@ class FakePrerequisites : StartPrerequisites {
 
     override suspend fun status(prerequisite: StartPrerequisite): PrerequisiteStatus = statuses.getValue(prerequisite)
 }
+
+class FakeNotifier : FocusNotifier {
+    /** How often "Focus ended" was posted. */
+    var focusEndedCount = 0
+        private set
+
+    @Synchronized
+    override fun focusEnded() {
+        focusEndedCount++
+    }
+}

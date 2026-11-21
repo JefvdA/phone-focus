@@ -33,6 +33,20 @@ interface UnlockScheduler {
     fun cancel()
 }
 
+/**
+ * Tells the user that focus mode has ended (the exit countdown ran out), e.g. with a "Focus
+ * ended" notification. Implemented in `infrastructure`; must not throw, and may show nothing
+ * (e.g. when notifications are not allowed).
+ */
+fun interface FocusNotifier {
+    fun focusEnded()
+
+    companion object {
+        /** Shows nothing. */
+        val NONE: FocusNotifier = FocusNotifier {}
+    }
+}
+
 /** The installed apps that have a launcher entry. Implemented in `infrastructure`. */
 interface InstalledAppsSource {
     /** The current apps, re-emitted whenever an app is installed, removed, updated or changed. */

@@ -9,6 +9,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import dev.phonefocus.application.AppCatalogueEntry
 import dev.phonefocus.application.CheckAppLaunch
 import dev.phonefocus.application.ExitCountdown
+import dev.phonefocus.application.ExitCountdownStatus
 import dev.phonefocus.application.FocusCommands
 import dev.phonefocus.application.FocusDesktop
 import dev.phonefocus.application.MakeStricterForm
@@ -37,8 +38,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Duration
 
-/** Which window is open on the desktop; the Focus dialog is hidden by default. */
-enum class LauncherDialog { Menu, Focus, MakeStricter }
+/**
+ * Which window is open on the desktop; the Focus dialog is hidden by default. [Focus] shows the
+ * exit-pending dialog (C5) instead while an exit countdown runs. [EmergencyEscape] is the
+ * confirmation before requesting exit.
+ */
+enum class LauncherDialog { Menu, Focus, MakeStricter, EmergencyEscape }
+
+/** The emergency escape / exit-pending flow (C5, #10). */
+data class ExitUiState(
+    /** A request or cancel is running. */
+    val busy: Boolean = false,
+    /** A one-line problem to show, e.g. a rejected request. */
+    val error: String? = null,
+)
 
 /** The "Make stricter" dialog (C4, #9). */
 data class MakeStricterUiState(
@@ -57,16 +70,21 @@ data class MakeStricterUiState(
 data class LauncherUiState(
     /** Session and desktop icons; null while loading. */
     val desktop: FocusDesktop? = null,
-    /** Time left on the exit countdown (trusted time); null when none runs. */
-    val remaining: Duration? = null,
+    /** The exit countdown (trusted time): time left and progress; null when none runs. */
+    val countdown: ExitCountdownStatus? = null,
     val dialog: LauncherDialog? = null,
     val stricter: MakeStricterUiState = MakeStricterUiState(),
-)
+    val exit: ExitUiState = ExitUiState(),
+) {
+    /** Time left on the exit countdown; null when none runs. */
+    val remaining: Duration? get() = countdown?.remaining
+}
 
 /**
  * State holder of the focus launcher (#8). Apps come from [ObserveFocusDesktop]; a tap is
  * checked with [CheckAppLaunch] before [launchApp] starts the app. While an exit countdown
- * runs, the remaining time is re-read every second from [ExitCountdown].
+ * runs, the remaining time is re-read every second from [ExitCountdown]. When focus ends, the
+ * focus windows close, so the "Focus is off" window with "Switch home back…" is in front.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class LauncherViewModel(
@@ -93,17 +111,22 @@ class LauncherViewModel(
 
     private val catalogue: Flow<List<AppCatalogueEntry>?> = observeCatalogue()
 
+    private val exitUi = MutableStateFlow(ExitUiState())
+
     private val desktops: Flow<FocusDesktop?> = observeDesktop()
 
-    private val remaining: Flow<Duration?> = desktops
+    private val countdownStatus: Flow<ExitCountdownStatus?> = desktops
         .map { it?.session?.state }
         .distinctUntilChanged()
+        .onEach { if (it == FocusState.Unlocked) closeFocusWindows() }
         .flatMapLatest { state ->
             if (state is FocusState.ExitPending) countdownTicks() else flowOf(null)
         }
 
+    private val windows: Flow<Pair<LauncherDialog?, ExitUiState>> = combine(dialog, exitUi, ::Pair)
+
     val state: StateFlow<LauncherUiState> =
-        combine(desktops, remaining, dialog, catalogue, stricterEdits) { desktop, remaining, dialog, apps, edits ->
+        combine(desktops, countdownStatus, windows, catalogue, stricterEdits) { desktop, countdown, (dialog, exit), apps, edits ->
             val session = desktop?.session
             val form = if (session != null && session.state.isFocusActive && apps != null) {
                 MakeStricterForm.create(apps, session, exitDelays, edits.rules, edits.delay)
@@ -111,24 +134,59 @@ class LauncherViewModel(
                 null
             }
             val stricter = MakeStricterUiState(form, edits.confirming && form?.hasChanges == true, edits.applying, edits.error)
-            LauncherUiState(desktop, remaining, dialog, stricter)
+            LauncherUiState(desktop, countdown, dialog, stricter, exit)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), LauncherUiState())
 
-    /** The remaining time now and then every second; nudges the unlock once it reaches zero. */
-    private fun countdownTicks(): Flow<Duration?> = flow {
+    /** The countdown now and then every second; nudges the unlock once it reaches zero. */
+    private fun countdownTicks(): Flow<ExitCountdownStatus?> = flow {
         while (true) {
-            emit(countdown.remaining())
+            emit(countdown.status())
             delay(TICK_MS)
         }
-    }.distinctUntilChanged().onEach { left ->
+    }.distinctUntilChanged().onEach { status ->
         // The unlock alarm normally ends the countdown; this covers a late or missed alarm.
-        if (left == Duration.ZERO) tick()
+        if (status?.remaining == Duration.ZERO) tick()
     }
 
     fun openDialog(which: LauncherDialog) {
         // "Make stricter" always starts from the session as it is now.
         if (which == LauncherDialog.MakeStricter && dialog.value != which) stricterEdits.value = StricterEdits()
+        if (which == LauncherDialog.EmergencyEscape) exitUi.value = ExitUiState()
         dialog.value = which
+    }
+
+    /**
+     * Confirmed "Emergency escape": starts the exit countdown with `requestExit`. On success the
+     * Focus window shows the exit-pending dialog with the countdown.
+     */
+    fun confirmEmergencyEscape() = runExitCommand(LauncherLabels.EXIT_REQUEST_FAILED) { commands.requestExit() }
+
+    /** "Cancel exit, stay focused": stops the countdown with `cancelExit`; focus stays on. */
+    fun cancelExit() = runExitCommand(LauncherLabels.EXIT_CANCEL_FAILED) { commands.cancelExit() }
+
+    private fun runExitCommand(failed: String, command: suspend () -> FocusResult) {
+        if (exitUi.value.busy) return
+        exitUi.value = ExitUiState(busy = true)
+        viewModelScope.launch {
+            val result = runCatching { command() }.getOrElse {
+                Log.e(TAG, "exit command failed", it)
+                exitUi.value = ExitUiState(error = failed)
+                return@launch
+            }
+            when (result) {
+                is FocusResult.Success -> {
+                    exitUi.value = ExitUiState()
+                    if (dialog.value == LauncherDialog.EmergencyEscape) dialog.value = LauncherDialog.Focus
+                }
+                is FocusResult.Failure -> exitUi.value = ExitUiState(error = LauncherLabels.exitRejected(result.error))
+            }
+        }
+    }
+
+    /** Focus has ended: the focus windows are gone, so "Focus is off" is in front. */
+    private fun closeFocusWindows() {
+        dialog.update { if (it == LauncherDialog.Menu) it else null }
+        exitUi.value = ExitUiState()
     }
 
     fun setStricterRule(packageName: String, rule: AppRule) {

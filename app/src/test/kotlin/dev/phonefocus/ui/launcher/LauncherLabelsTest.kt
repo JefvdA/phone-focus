@@ -13,6 +13,7 @@ import dev.phonefocus.domain.FocusSession
 import dev.phonefocus.domain.FocusState
 import dev.phonefocus.domain.Loosening
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Duration
 
@@ -20,7 +21,42 @@ class LauncherLabelsTest {
     @Test
     fun `focus button shows Focus, or the remaining time while exit is pending`() {
         assertEquals("Focus", LauncherLabels.focusButton(null))
-        assertEquals("Exit 23:41", LauncherLabels.focusButton(Duration.ofHours(23).plusMinutes(41).plusSeconds(7)))
+        assertEquals("Exit 23:42", LauncherLabels.focusButton(Duration.ofHours(23).plusMinutes(41).plusSeconds(7)))
+        assertEquals("Exit 24:00", LauncherLabels.focusButton(Duration.ofHours(24)))
+    }
+
+    @Test
+    fun `emergency escape confirmation uses the session's actual delay`() {
+        assertEquals(
+            "The phone unlocks in 24 hours. Continue?\n\nFocus mode stays on until then. You can cancel the exit at any time.",
+            LauncherLabels.emergencyConfirmation(ExitDelay.ONE_DAY),
+        )
+        assertTrue(LauncherLabels.emergencyConfirmation(ExitDelay.SEVEN_DAYS).startsWith("The phone unlocks in 7 days."))
+        assertTrue(LauncherLabels.emergencyConfirmation(ExitDelay(Duration.ofMinutes(1))).startsWith("The phone unlocks in 1 minute."))
+    }
+
+    @Test
+    fun `exit countdown shows hh mm ss, rounded up`() {
+        assertEquals("23:41:08", LauncherLabels.exitCountdown(Duration.ofHours(23).plusMinutes(41).plusSeconds(7).plusMillis(200)))
+        assertEquals("00:00:00", LauncherLabels.exitCountdown(Duration.ZERO))
+    }
+
+    @Test
+    fun `rejected exit commands explain why`() {
+        assertEquals(
+            "Focus mode has already ended.",
+            LauncherLabels.exitRejected(FocusError.InvalidTransition(FocusCommand.CancelExit, FocusState.Unlocked)),
+        )
+        assertEquals(
+            "No exit is requested.",
+            LauncherLabels.exitRejected(FocusError.InvalidTransition(FocusCommand.CancelExit, FocusState.Focused)),
+        )
+        assertEquals(
+            "Exit is already requested.",
+            LauncherLabels.exitRejected(
+                FocusError.InvalidTransition(FocusCommand.RequestExit, FocusState.ExitPending(java.time.Instant.EPOCH)),
+            ),
+        )
     }
 
     @Test

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,19 +25,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import dev.phonefocus.application.ExitCountdownStatus
 import dev.phonefocus.application.FocusDesktop
 import dev.phonefocus.application.InstalledApp
 import dev.phonefocus.domain.AppPolicy
 import dev.phonefocus.domain.AppRule
 import dev.phonefocus.domain.EssentialApps
+import dev.phonefocus.domain.ExitDelay
 import dev.phonefocus.domain.FocusResult
 import dev.phonefocus.domain.FocusSession
 import dev.phonefocus.domain.FocusState
 import dev.phonefocus.ui.components.DesktopIcon
 import dev.phonefocus.ui.components.RetroButton
+import dev.phonefocus.ui.components.RetroProgressBar
 import dev.phonefocus.ui.components.RetroWindow
 import dev.phonefocus.ui.components.Taskbar
 import dev.phonefocus.ui.components.TaskbarButton
@@ -61,12 +66,17 @@ class LauncherActions(
     val onSwitchHomeBack: () -> Unit,
     /** The "Make stricter" dialog (C4). */
     val stricter: MakeStricterActions,
+    /** Emergency escape confirmed: start the exit countdown (C5). */
+    val onConfirmEmergencyEscape: () -> Unit,
+    /** "Cancel exit, stay focused" (C5). */
+    val onCancelExit: () -> Unit,
 )
 
 /**
  * The focus launcher (C3, #8): teal desktop with the allowed apps and a taskbar with Menu,
  * Focus button (the remaining time while an exit countdown runs) and a clock. While Unlocked
- * it shows "Focus is off" with a way back to One UI Home instead of apps.
+ * it shows "Focus is off" with a way back to One UI Home instead of apps. The Focus button opens
+ * the Focus dialog, or the exit-pending dialog (C5, #10) while an exit countdown runs.
  */
 @Composable
 fun DesktopScreen(
@@ -101,11 +111,30 @@ fun DesktopScreen(
     when (state.dialog) {
         LauncherDialog.Menu -> MenuDialog(focusActive, actions)
         LauncherDialog.Focus -> if (desktop != null && focusActive) {
-            FocusDialog(
-                desktop.session,
-                state.remaining,
-                onMakeStricter = { actions.onOpenDialog(LauncherDialog.MakeStricter) },
-                onClose = actions.onCloseDialog,
+            val countdown = state.countdown
+            if (desktop.session.state is FocusState.ExitPending && countdown != null) {
+                ExitPendingDialog(
+                    countdown,
+                    state.exit,
+                    onCancelExit = actions.onCancelExit,
+                    onMakeStricter = { actions.onOpenDialog(LauncherDialog.MakeStricter) },
+                    onClose = actions.onCloseDialog,
+                )
+            } else if (desktop.session.state == FocusState.Focused) {
+                FocusDialog(
+                    desktop.session,
+                    onMakeStricter = { actions.onOpenDialog(LauncherDialog.MakeStricter) },
+                    onEmergencyEscape = { actions.onOpenDialog(LauncherDialog.EmergencyEscape) },
+                    onClose = actions.onCloseDialog,
+                )
+            }
+        }
+        LauncherDialog.EmergencyEscape -> if (desktop != null && desktop.session.state == FocusState.Focused) {
+            EmergencyEscapeDialog(
+                desktop.session.exitDelay,
+                state.exit,
+                onConfirm = actions.onConfirmEmergencyEscape,
+                onCancel = { actions.onOpenDialog(LauncherDialog.Focus) },
             )
         }
         LauncherDialog.MakeStricter -> if (desktop != null && focusActive) {
@@ -149,24 +178,85 @@ private fun FocusOffWindow(actions: LauncherActions, modifier: Modifier = Modifi
     }
 }
 
-/** The Focus dialog, opened from the taskbar: state, exit delay and the ways to change it. */
+/** The Focus dialog, opened from the taskbar while focused: exit delay and the ways to change it. */
 @Composable
-private fun FocusDialog(session: FocusSession, remaining: Duration?, onMakeStricter: () -> Unit, onClose: () -> Unit) {
+private fun FocusDialog(session: FocusSession, onMakeStricter: () -> Unit, onEmergencyEscape: () -> Unit, onClose: () -> Unit) {
     Dialog(onDismissRequest = onClose) {
         RetroWindow(title = "Focus", onClose = onClose) {
             Text(LauncherLabels.FOCUS_ON, style = RetroTypography.Body)
             Spacer(Modifier.height(4.dp))
             Text(LauncherLabels.exitDelay(session.exitDelay), style = RetroTypography.Body)
-            if (session.state is FocusState.ExitPending && remaining != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(LauncherLabels.exitPending(remaining), style = RetroTypography.Body)
-            }
             Spacer(Modifier.height(12.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 RetroButton("Make stricter…", onClick = onMakeStricter, modifier = Modifier.fillMaxWidth())
-                // TODO(#10): open the emergency escape / exit countdown flow.
-                RetroButton("Emergency escape…", onClick = {}, enabled = false, modifier = Modifier.fillMaxWidth())
+                RetroButton("Emergency escape…", onClick = onEmergencyEscape, modifier = Modifier.fillMaxWidth())
                 RetroButton("Close", onClick = onClose, isDefault = true, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+/** Confirmation before the exit countdown starts, with the session's actual exit delay. */
+@Composable
+private fun EmergencyEscapeDialog(delay: ExitDelay, exit: ExitUiState, onConfirm: () -> Unit, onCancel: () -> Unit) {
+    Dialog(onDismissRequest = onCancel) {
+        RetroWindow(title = "Emergency escape", onClose = onCancel) {
+            Text(LauncherLabels.emergencyConfirmation(delay), style = RetroTypography.Body)
+            exit.error?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = RetroTypography.Body)
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Staying focused is the default; starting the countdown takes a deliberate tap.
+                RetroButton("Cancel", onClick = onCancel, isDefault = true, modifier = Modifier.weight(1f))
+                RetroButton("Continue", onClick = onConfirm, enabled = !exit.busy, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/**
+ * The exit-pending dialog (C5): the time left as hh:mm:ss, a progress bar of the elapsed part
+ * of the countdown and a way to cancel the exit.
+ */
+@Composable
+private fun ExitPendingDialog(
+    countdown: ExitCountdownStatus,
+    exit: ExitUiState,
+    onCancelExit: () -> Unit,
+    onMakeStricter: () -> Unit,
+    onClose: () -> Unit,
+) {
+    Dialog(onDismissRequest = onClose) {
+        RetroWindow(title = "Exit pending", onClose = onClose) {
+            Text(LauncherLabels.EXIT_PENDING_INTRO, style = RetroTypography.Body)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                LauncherLabels.exitCountdown(countdown.remaining),
+                style = RetroTypography.Countdown,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            RetroProgressBar(countdown.elapsedFraction, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            Text(LauncherLabels.EXIT_PENDING_NOTE, style = RetroTypography.Body)
+            exit.error?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = RetroTypography.Body)
+            }
+            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                RetroButton(
+                    "Cancel exit, stay focused",
+                    onClick = onCancelExit,
+                    enabled = !exit.busy,
+                    isDefault = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                RetroButton("Make stricter…", onClick = onMakeStricter, modifier = Modifier.fillMaxWidth())
+                RetroButton("Close", onClick = onClose, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -218,7 +308,7 @@ private fun previewDesktop(state: FocusState): FocusDesktop {
     return FocusDesktop.of(session, apps, EssentialApps.NONE, "dev.phonefocus")
 }
 
-private val previewActions = LauncherActions({}, {}, {}, {}, {}, MakeStricterActions({ _, _ -> }, {}, {}, {}, {}, {}))
+private val previewActions = LauncherActions({}, {}, {}, {}, {}, MakeStricterActions({ _, _ -> }, {}, {}, {}, {}, {}), {}, {})
 
 @Preview(widthDp = 360, heightDp = 640)
 @Composable
@@ -236,7 +326,39 @@ private fun DesktopExitPendingPreview() {
         val placeholder = rememberVectorPainter(RetroIcons.AppPlaceholder)
         val state = FocusState.ExitPending(java.time.Instant.parse("2026-01-02T00:00:00Z"))
         DesktopScreen(
-            LauncherUiState(previewDesktop(state), remaining = Duration.ofMinutes(23 * 60 + 41)),
+            LauncherUiState(
+                previewDesktop(state),
+                countdown = ExitCountdownStatus(Duration.ofMinutes(23 * 60 + 41).plusSeconds(7), Duration.ofHours(24)),
+            ),
+            previewActions,
+        ) { placeholder }
+    }
+}
+
+@Preview(widthDp = 360, heightDp = 640)
+@Composable
+private fun ExitPendingDialogPreview() {
+    RetroTheme {
+        val placeholder = rememberVectorPainter(RetroIcons.AppPlaceholder)
+        val state = FocusState.ExitPending(java.time.Instant.parse("2026-01-02T00:00:00Z"))
+        DesktopScreen(
+            LauncherUiState(
+                previewDesktop(state),
+                countdown = ExitCountdownStatus(Duration.ofHours(15).plusMinutes(12).plusSeconds(30), Duration.ofHours(24)),
+                dialog = LauncherDialog.Focus,
+            ),
+            previewActions,
+        ) { placeholder }
+    }
+}
+
+@Preview(widthDp = 360, heightDp = 640)
+@Composable
+private fun EmergencyEscapePreview() {
+    RetroTheme {
+        val placeholder = rememberVectorPainter(RetroIcons.AppPlaceholder)
+        DesktopScreen(
+            LauncherUiState(previewDesktop(FocusState.Focused), dialog = LauncherDialog.EmergencyEscape),
             previewActions,
         ) { placeholder }
     }

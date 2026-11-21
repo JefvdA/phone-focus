@@ -6,11 +6,13 @@ import java.time.Instant
 
 /**
  * What is persisted: the [session] plus, while an exit countdown runs, the [checkpoint] the
- * countdown is measured from (see [TrustedTime]).
+ * countdown is measured from (see [TrustedTime]) and the trusted time it started at
+ * ([countdownStartedAt], for the progress bar; null for countdowns started before it was kept).
  */
 data class FocusRecord(
     val session: FocusSession,
     val checkpoint: TimeCheckpoint? = null,
+    val countdownStartedAt: Instant? = null,
 ) {
     companion object {
         /** Nothing persisted yet: a fresh, unlocked session. */

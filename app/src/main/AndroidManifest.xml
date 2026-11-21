@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Exact unlock alarm, granted at install (personal sideloaded app, not on Play). -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- "Focus ended" notification (#10); asked for when starting focus, optional. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Package visibility for the app catalogue (#5): launchable apps (like the app drawer)
          and the dialer, without QUERY_ALL_PACKAGES. -->

@@ -35,6 +35,7 @@ object FocusRecordCodec {
     private val CHECKPOINT_TRUSTED_TIME = stringPreferencesKey("checkpoint_trusted_time")
     private val CHECKPOINT_ELAPSED = stringPreferencesKey("checkpoint_elapsed_realtime")
     private val CHECKPOINT_BOOT_COUNT = intPreferencesKey("checkpoint_boot_count")
+    private val COUNTDOWN_STARTED_AT = stringPreferencesKey("countdown_started_at")
 
     private const val UNLOCKED = "unlocked"
     private const val FOCUSED = "focused"
@@ -60,6 +61,7 @@ object FocusRecordCodec {
             into[CHECKPOINT_ELAPSED] = it.elapsedRealtime.toString()
             into[CHECKPOINT_BOOT_COUNT] = it.bootCount
         }
+        record.countdownStartedAt?.let { into[COUNTDOWN_STARTED_AT] = it.toString() }
     }
 
     /**
@@ -84,7 +86,8 @@ object FocusRecordCodec {
             val boot = prefs[CHECKPOINT_BOOT_COUNT]
             if (trusted != null && elapsed != null && boot != null) TimeCheckpoint(trusted, elapsed, boot) else null
         }
-        return FocusRecord(FocusSession.restore(state, policy, delay), checkpoint)
+        val countdownStartedAt = prefs[COUNTDOWN_STARTED_AT]?.let(::parseInstant)
+        return FocusRecord(FocusSession.restore(state, policy, delay), checkpoint, countdownStartedAt)
     }
 
     private fun parseRule(entry: String): Pair<String, AppRule>? {
