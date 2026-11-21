@@ -4,6 +4,7 @@ import dev.phonefocus.domain.AppAccess
 import dev.phonefocus.domain.EssentialApps
 import dev.phonefocus.domain.FocusSession
 import dev.phonefocus.domain.NeverBlockedPackages
+import dev.phonefocus.domain.ShortVideoApps
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -27,8 +28,14 @@ enum class ForegroundVerdict(val bounces: Boolean) {
     /** A system package that must never be blocked (calls, system UI, keyboard, ...). */
     NeverBlocked(false),
 
-    /** [AppAccess] lets it be used now: an Allowed / No short videos app or an essential app. */
+    /** [AppAccess] lets it be used now: an Allowed app or an essential app. */
     Allowed(false),
+
+    /**
+     * [AppAccess] lets it be used, but not its short-video feed (No short videos, #12): it stays,
+     * and its screens are inspected by [EvaluateShortVideoScreen].
+     */
+    ShortVideosBlocked(false),
 
     /** No launcher entry: not an app the user can pick in the catalogue (system component, overlay). */
     NotAnApp(false),
@@ -51,12 +58,24 @@ data class AppBlockingContext(
      * packages never are; otherwise [AppAccess] decides for every app with a launcher entry,
      * so unlisted and newly installed apps are blocked like Blocked ones.
      */
-    fun verdict(packageName: String): ForegroundVerdict = when {
-        !session.state.isFocusActive -> ForegroundVerdict.Unlocked
-        packageName in NeverBlockedPackages || packageName in systemPackages -> ForegroundVerdict.NeverBlocked
-        AppAccess(session, essentialApps).canLaunch(packageName) -> ForegroundVerdict.Allowed
-        packageName !in launchablePackages -> ForegroundVerdict.NotAnApp
-        else -> ForegroundVerdict.Blocked
+    fun verdict(packageName: String): ForegroundVerdict {
+        if (!session.state.isFocusActive) return ForegroundVerdict.Unlocked
+        if (packageName in NeverBlockedPackages || packageName in systemPackages) return ForegroundVerdict.NeverBlocked
+        val access = AppAccess(session, essentialApps)
+        return when {
+            access.canLaunch(packageName) && access.blocksShortVideos(packageName) -> ForegroundVerdict.ShortVideosBlocked
+            access.canLaunch(packageName) -> ForegroundVerdict.Allowed
+            packageName !in launchablePackages -> ForegroundVerdict.NotAnApp
+            else -> ForegroundVerdict.Blocked
+        }
+    }
+
+    /**
+     * The apps whose screens must be inspected for short videos now ([ForegroundVerdict.ShortVideosBlocked]).
+     * Empty while Unlocked, so the service can stop listening to content changes then.
+     */
+    val shortVideoBlockedPackages: Set<String> by lazy {
+        ShortVideoApps.PACKAGES.filterTo(HashSet()) { verdict(it) == ForegroundVerdict.ShortVideosBlocked }
     }
 }
 
