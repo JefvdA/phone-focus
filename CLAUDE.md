@@ -11,7 +11,9 @@ Single Gradle module `app`, Kotlin + Jetpack Compose, minSdk 34. Package root
 - `domain`: the `FocusSession` aggregate, value objects (`AppRule`, `AppPolicy`,
   `ExitDelay`), commands and invariants. **Pure Kotlin: no `android.*` or `androidx.*`
   imports**, no I/O, no system clock (time is passed in, e.g. `now`). The single source
-  of truth for focus state.
+  of truth for focus state. Launcher and accessibility service check apps through the
+  `AppAccess` domain service (session + device `EssentialApps`, which are never blocked),
+  not the policy directly.
 - `application`: use cases that load the aggregate, call domain commands and persist the
   result. Depends on `domain` only; defines ports (interfaces) for what it needs.
 - `infrastructure`: implementations of those ports: persistence, Android services

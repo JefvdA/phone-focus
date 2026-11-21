@@ -6,8 +6,11 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.preferencesDataStore
 import dev.phonefocus.application.ExitDelayOptions
 import dev.phonefocus.application.FocusCommands
+import dev.phonefocus.application.ObserveAppCatalogue
 import dev.phonefocus.application.ObserveFocusSession
 import dev.phonefocus.domain.ExitDelay
+import dev.phonefocus.infrastructure.apps.AppIconLoader
+import dev.phonefocus.infrastructure.apps.PackageManagerAppCatalogue
 import dev.phonefocus.infrastructure.persistence.DataStoreFocusSessionRepository
 import dev.phonefocus.infrastructure.persistence.FocusRecordCodec
 import dev.phonefocus.infrastructure.time.AlarmUnlockScheduler
@@ -38,6 +41,12 @@ class AppContainer(context: Context) {
     )
 
     val observeSession = ObserveFocusSession(repository)
+
+    private val appCatalogue = PackageManagerAppCatalogue(appContext, scope)
+
+    val observeAppCatalogue = ObserveAppCatalogue(appCatalogue, appCatalogue)
+
+    val appIcons = AppIconLoader(appContext)
 
     val isDebugBuild: Boolean = (appContext.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 

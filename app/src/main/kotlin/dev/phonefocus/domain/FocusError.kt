@@ -10,7 +10,16 @@ sealed interface FocusError {
 
     /** A `tighten` contained changes that would loosen the policy or delay; nothing was applied. */
     data class NotStricter(val loosenings: List<Loosening>) : FocusError
+
+    /**
+     * The policy or a `tighten` gave apps a rule they do not support ([AppRule.ShortVideoBlocked]
+     * for an app outside [ShortVideoApps]); nothing was applied.
+     */
+    data class UnsupportedRules(val rules: List<UnsupportedRule>) : FocusError
 }
+
+/** [rule] cannot be applied to [packageName]. */
+data class UnsupportedRule(val packageName: String, val rule: AppRule)
 
 /** A single change that would make the policy or delay less strict. */
 sealed interface Loosening {

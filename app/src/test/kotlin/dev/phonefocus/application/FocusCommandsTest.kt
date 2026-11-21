@@ -23,7 +23,7 @@ import java.time.Instant
 
 class FocusCommandsTest {
     private val t0 = Instant.parse("2026-01-01T08:00:00Z")
-    private val policy = AppPolicy(mapOf("org.phone" to AppRule.Allowed, "com.instagram" to AppRule.ShortVideoBlocked))
+    private val policy = AppPolicy(mapOf("org.phone" to AppRule.Allowed, "com.instagram.android" to AppRule.ShortVideoBlocked))
     private val delay = ExitDelay.ONE_DAY
     private val day = Duration.ofDays(1)
 

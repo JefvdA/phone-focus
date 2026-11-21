@@ -26,6 +26,16 @@ class AppPolicy(rules: Map<String, AppRule> = emptyMap()) {
             .filterNot { (pkg, rule) -> ruleFor(pkg).allowsChangeTo(rule) }
             .map { (pkg, rule) -> Loosening.AppRuleLoosened(pkg, ruleFor(pkg), rule) }
 
+    /**
+     * The rules in [rules] that their package does not support, in package-name order:
+     * [AppRule.ShortVideoBlocked] is only valid for apps in [ShortVideoApps].
+     */
+    fun unsupportedRulesIn(rules: Map<String, AppRule> = this.rules): List<UnsupportedRule> =
+        rules.entries
+            .sortedBy { it.key }
+            .filter { (pkg, rule) -> rule == AppRule.ShortVideoBlocked && !ShortVideoApps.supports(pkg) }
+            .map { (pkg, rule) -> UnsupportedRule(pkg, rule) }
+
     /** A new policy with [changes] applied on top of this one. Does not check strictness. */
     fun with(changes: Map<String, AppRule>): AppPolicy = AppPolicy(rules + changes)
 
