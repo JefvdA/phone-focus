@@ -2,6 +2,7 @@ package dev.phonefocus.infrastructure.system
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -242,7 +243,7 @@ class FocusAccessibilityService : AccessibilityService() {
     private fun screenOf(windows: List<AppWindow>, event: AccessibilityEvent?): ForegroundScreen {
         if (windows.isEmpty()) {
             val pkg = event?.packageName?.toString() ?: return ForegroundScreen(emptyList())
-            return ForegroundScreen(listOf(ForegroundWindow(pkg, defaultDisplay = event.displayId == Display.DEFAULT_DISPLAY)))
+            return ForegroundScreen(listOf(ForegroundWindow(pkg, defaultDisplay = isOnDefaultDisplay(event))))
         }
         val desktopInFront = windows.any { (window, _, pkg) ->
             pkg == packageName && window.displayId == Display.DEFAULT_DISPLAY && (window.isActive || window.isFocused)
@@ -258,6 +259,10 @@ class FocusAccessibilityService : AccessibilityService() {
             desktopInFront,
         )
     }
+
+    /** The event's display is only known on API 33+; below, assume the main display. */
+    private fun isOnDefaultDisplay(event: AccessibilityEvent): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || event.displayId == Display.DEFAULT_DISPLAY
 
     private fun recheckIn(delayMillis: Long) {
         handler.removeCallbacks(recheck)

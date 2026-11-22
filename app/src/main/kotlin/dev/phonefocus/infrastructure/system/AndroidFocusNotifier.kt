@@ -1,13 +1,11 @@
 package dev.phonefocus.infrastructure.system
 
-import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.util.Log
 import dev.phonefocus.R
 import dev.phonefocus.application.FocusNotifier
@@ -17,8 +15,8 @@ import dev.phonefocus.application.FocusNotifier
  * opens the focus launcher, whose "Focus is off" window offers switching the home screen back
  * to One UI Home.
  *
- * Skipped silently when the user has not allowed notifications (`POST_NOTIFICATIONS`, asked for
- * when starting focus) or turned them off: the launcher still shows "Focus is off".
+ * Skipped silently when the user has not allowed notifications (`POST_NOTIFICATIONS` on Android
+ * 13+, asked for when starting focus) or turned them off: the launcher still shows "Focus is off".
  */
 class AndroidFocusNotifier(private val context: Context) : FocusNotifier {
     private val manager = context.getSystemService(NotificationManager::class.java)
@@ -38,8 +36,7 @@ class AndroidFocusNotifier(private val context: Context) : FocusNotifier {
     }
 
     private fun canPost(): Boolean =
-        context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED &&
-            manager.areNotificationsEnabled()
+        NotificationPermission.isGranted(context) && manager.areNotificationsEnabled()
 
     private fun ensureChannel() {
         val channel = NotificationChannel(CHANNEL_ID, "Focus mode", NotificationManager.IMPORTANCE_DEFAULT).apply {

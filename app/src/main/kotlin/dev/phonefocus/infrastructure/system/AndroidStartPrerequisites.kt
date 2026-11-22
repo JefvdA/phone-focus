@@ -4,7 +4,6 @@ import android.app.role.RoleManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import dev.phonefocus.application.PrerequisiteStatus
@@ -35,7 +34,7 @@ class AndroidStartPrerequisites(context: Context) : StartPrerequisites {
     private fun defaultHomeStatus(): PrerequisiteStatus {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(packageName)
         val declared = appContext.packageManager
-            .queryIntentActivities(home, PackageManager.ResolveInfoFlags.of(0))
+            .queryActivities(home)
             .isNotEmpty()
         if (!declared) return PrerequisiteStatus.NotAvailable
         val roles = appContext.getSystemService(RoleManager::class.java)

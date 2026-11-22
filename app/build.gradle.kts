@@ -20,7 +20,7 @@ android {
 
     defaultConfig {
         applicationId = "dev.phonefocus"
-        minSdk = 33
+        minSdk = 31
         targetSdk = 36
         versionCode = ciVersionCode ?: 1
         versionName = "0.1.0"

@@ -1,9 +1,9 @@
 package dev.phonefocus.infrastructure
 
 import android.app.Application
-import android.content.Context
 import android.content.IntentFilter
 import android.util.Log
+import androidx.core.content.ContextCompat
 import dev.phonefocus.infrastructure.system.FocusEventReceiver
 import kotlinx.coroutines.launch
 
@@ -22,7 +22,7 @@ class PhoneFocusApp : Application() {
         // Screen-on, user-present and shutdown are only delivered to runtime receivers. They
         // work while the process is alive; boot and the unlock alarm cover the other cases.
         val filter = IntentFilter().apply { FocusEventReceiver.RUNTIME_ACTIONS.forEach(::addAction) }
-        registerReceiver(FocusEventReceiver(), filter, Context.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(this, FocusEventReceiver(), filter, ContextCompat.RECEIVER_NOT_EXPORTED)
 
         container.scope.launch {
             runCatching { container.commands.tick() }

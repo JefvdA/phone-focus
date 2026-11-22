@@ -3,7 +3,7 @@ package dev.phonefocus.ui
 import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -23,6 +23,7 @@ import dev.phonefocus.domain.AppVersion
 import dev.phonefocus.infrastructure.AppContainer
 import dev.phonefocus.infrastructure.PhoneFocusApp
 import dev.phonefocus.infrastructure.system.AndroidStartPrerequisites
+import dev.phonefocus.infrastructure.system.NotificationPermission
 import dev.phonefocus.ui.setup.FocusSetupActions
 import dev.phonefocus.ui.setup.FocusSetupEvent
 import dev.phonefocus.ui.setup.FocusSetupScreen
@@ -92,10 +93,11 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Asks once per start for permission to post notifications, so the user hears when focus
-     * ends (#10). A refusal is respected: the notification is then skipped silently.
+     * ends (#10). A refusal is respected: the notification is then skipped silently. Only on
+     * Android 13+: below that the permission does not exist and notifications are on by default.
      */
     private fun askForNotifications() {
-        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !NotificationPermission.isGranted(this)) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }

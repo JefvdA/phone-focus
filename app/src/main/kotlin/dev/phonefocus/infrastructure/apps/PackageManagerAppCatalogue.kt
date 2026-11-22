@@ -8,10 +8,13 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import android.telecom.TelecomManager
+import androidx.core.content.ContextCompat
 import dev.phonefocus.application.EssentialAppsSource
 import dev.phonefocus.application.InstalledApp
 import dev.phonefocus.application.InstalledAppsSource
 import dev.phonefocus.domain.EssentialApps
+import dev.phonefocus.infrastructure.system.queryActivities
+import dev.phonefocus.infrastructure.system.resolveActivityInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -54,9 +57,9 @@ class PackageManagerAppCatalogue(
             addAction(TelecomManager.ACTION_DEFAULT_DIALER_CHANGED)
             addAction(Intent.ACTION_LOCALE_CHANGED)
         }
-        appContext.registerReceiver(receiver, packageFilter, Context.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(appContext, receiver, packageFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
         // Second registration of the same receiver: the package filter needs a data scheme, these don't.
-        appContext.registerReceiver(receiver, systemFilter, Context.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(appContext, receiver, systemFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
         trySend(Unit)
         awaitClose { appContext.unregisterReceiver(receiver) }
     }.conflate()
@@ -76,7 +79,7 @@ class PackageManagerAppCatalogue(
     /** One entry per package with a launcher activity, as in the app drawer. */
     private fun queryLaunchableApps(): List<InstalledApp> {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val activities = packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+        val activities = packageManager.queryActivities(intent)
         return activities
             .groupBy { it.activityInfo.packageName }
             .map { (packageName, entries) ->
@@ -98,7 +101,7 @@ class PackageManagerAppCatalogue(
     }
 
     private fun resolvePackage(intent: Intent): String? =
-        packageManager.resolveActivity(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+        packageManager.resolveActivityInfo(intent, PackageManager.MATCH_DEFAULT_ONLY)
             ?.activityInfo?.packageName
             // The resolver ("choose an app") dialog means there is no single default.
             ?.takeIf { it != "android" }

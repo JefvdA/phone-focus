@@ -5,10 +5,10 @@ concept, domain model, invariants and architecture; read it before changing the 
 
 ## Architecture (DDD)
 
-Single Gradle module `app`, Kotlin + Jetpack Compose, minSdk 33 (Android 13). The target
-device is a Galaxy Z Flip 6; the current test device is a Galaxy Tab S7 on Android 13 (#25),
-so any Android API newer than 33 needs a `Build.VERSION.SDK_INT` check (`lintDebug` reports
-`NewApi`). Package root `dev.phonefocus`, split into layers:
+Single Gradle module `app`, Kotlin + Jetpack Compose, minSdk 31 (Android 12). The target
+device is a Galaxy Z Flip 6; the current test device is a Galaxy Tab S7 on Android 12 (#29),
+so any Android API newer than 31 needs a `Build.VERSION.SDK_INT` check with a working
+fallback on 31/32 (`lintDebug` reports `NewApi` / `InlinedApi`). Package root `dev.phonefocus`, split into layers:
 
 - `domain`: the `FocusSession` aggregate, value objects (`AppRule`, `AppPolicy`,
   `ExitDelay`), commands and invariants. **Pure Kotlin: no `android.*` or `androidx.*`
