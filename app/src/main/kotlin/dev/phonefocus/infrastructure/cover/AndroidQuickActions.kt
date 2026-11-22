@@ -12,6 +12,8 @@ import android.telecom.TelecomManager
 import android.util.Log
 import dev.phonefocus.application.QuickAction
 import dev.phonefocus.application.QuickActionResolver
+import dev.phonefocus.infrastructure.system.queryActivities
+import dev.phonefocus.infrastructure.system.resolveActivityInfo
 
 /**
  * The apps behind the cover screen's quick buttons (#13), found with the standard intents
@@ -34,14 +36,14 @@ class AndroidQuickActions(context: Context) : QuickActionResolver {
         }
         val intent = queryIntent(action)
         val default = packageManager
-            .resolveActivity(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+            .resolveActivityInfo(intent, PackageManager.MATCH_DEFAULT_ONLY)
             ?.activityInfo?.packageName
             // The resolver ("choose an app") dialog means there is no single default.
             ?.takeIf { it != "android" }
         if (default != null) return default
         // Music apps often declare APP_MUSIC on their launcher activity without CATEGORY_DEFAULT:
         // take the only one installed, if there is exactly one.
-        return packageManager.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+        return packageManager.queryActivities(intent)
             .map { it.activityInfo.packageName }
             .distinct()
             .singleOrNull()

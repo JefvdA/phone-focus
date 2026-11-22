@@ -5,13 +5,13 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.telecom.TelecomManager
 import android.view.inputmethod.InputMethodManager
+import androidx.core.content.ContextCompat
 import dev.phonefocus.application.SystemPackagesSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,11 +56,12 @@ class AndroidSystemPackages(context: Context, scope: CoroutineScope) : SystemPac
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         }
-        appContext.registerReceiver(receiver, packageFilter, Context.RECEIVER_NOT_EXPORTED)
-        appContext.registerReceiver(
+        ContextCompat.registerReceiver(appContext, receiver, packageFilter, ContextCompat.RECEIVER_NOT_EXPORTED)
+        ContextCompat.registerReceiver(
+            appContext,
             receiver,
             IntentFilter(TelecomManager.ACTION_DEFAULT_DIALER_CHANGED),
-            Context.RECEIVER_NOT_EXPORTED,
+            ContextCompat.RECEIVER_NOT_EXPORTED,
         )
         trySend(Unit)
         awaitClose {
@@ -86,7 +87,7 @@ class AndroidSystemPackages(context: Context, scope: CoroutineScope) : SystemPac
 
         // Home apps: One UI Home keeps drawing recents while this app is the default home.
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-        packageManager.queryIntentActivities(home, PackageManager.ResolveInfoFlags.of(0))
+        packageManager.queryActivities(home)
             .forEach { add(it.activityInfo.packageName) }
 
         // Dialers: calls must always work.

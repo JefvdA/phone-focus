@@ -3,8 +3,13 @@
 
     <!-- Restore focus and re-schedule the unlock after a reboot (#4). -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Exact unlock alarm, granted at install (personal sideloaded app, not on Play). -->
+    <!-- Exact unlock alarm. Android 13+: USE_EXACT_ALARM, granted at install (personal sideloaded
+         app, not on Play). Android 12 (no USE_EXACT_ALARM): SCHEDULE_EXACT_ALARM, granted by default
+         there but revocable; AlarmUnlockScheduler falls back to an inexact alarm without it. -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission
+        android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
     <!-- "Focus ended" notification (#10); asked for when starting focus, optional. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Cover-screen Timer button (#13): clock apps guard their timer screen with it (normal permission). -->
@@ -127,6 +132,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <!-- Android 12: exact alarms allowed again, re-schedule the unlock exactly. -->
+                <action android:name="android.app.action.SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED" />
             </intent-filter>
         </receiver>
     </application>

@@ -1,5 +1,6 @@
 package dev.phonefocus.infrastructure.system
 
+import android.app.AlarmManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -9,9 +10,9 @@ import kotlinx.coroutines.launch
 
 /**
  * Runs `tick` (unlock if due, otherwise refresh the checkpoint and re-schedule the unlock)
- * on system events: boot, app update and the unlock alarm (declared in the manifest), plus
- * screen-on, user-present and shutdown (registered at runtime by [PhoneFocusApp], because
- * Android only delivers those to runtime receivers).
+ * on system events: boot, app update, exact alarms allowed again (Android 12) and the unlock
+ * alarm (declared in the manifest), plus screen-on, user-present and shutdown (registered at
+ * runtime by [PhoneFocusApp], because Android only delivers those to runtime receivers).
  */
 class FocusEventReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -45,6 +46,8 @@ class FocusEventReceiver : BroadcastReceiver() {
         private val HANDLED_ACTIONS = RUNTIME_ACTIONS + listOf(
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED,
+            // Android 12: SCHEDULE_EXACT_ALARM granted again (revoking it cancels exact alarms).
+            AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED,
             ACTION_UNLOCK_ALARM,
         )
     }

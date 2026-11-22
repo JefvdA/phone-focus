@@ -67,8 +67,8 @@ The focus session is stored in a Preferences DataStore (`infrastructure/persiste
 survives app kills and reboots. The app re-evaluates it (`tick`: unlock if the countdown has
 ended, otherwise re-schedule the unlock) on app start, boot, app update, screen-on /
 user-present, shutdown, and when the unlock alarm fires. The alarm is an exact
-`ELAPSED_REALTIME_WAKEUP` alarm (`USE_EXACT_ALARM`); if exact alarms are not allowed it falls
-back to an inexact one, which can only make the unlock a little late, never early.
+`ELAPSED_REALTIME_WAKEUP` alarm (`USE_EXACT_ALARM` on Android 13+, `SCHEDULE_EXACT_ALARM` on
+Android 12); if exact alarms are not allowed it falls back to an inexact one, which can only make the unlock a little late, never early.
 
 ### Clock tampering (v1)
 
@@ -90,8 +90,8 @@ Debug builds show a small debug panel with a one-minute exit delay
 
 ## Project layout
 
-Single `app` module, Kotlin + Jetpack Compose, minSdk 33 (Android 13). The target device
-is a Galaxy Z Flip 6; the minimum is 33 so the app can also be tested on a Galaxy Tab S7,
-whose last major update is Android 13. Code lives under
+Single `app` module, Kotlin + Jetpack Compose, minSdk 31 (Android 12). The target device
+is a Galaxy Z Flip 6; the minimum is 31 so the app can also be tested on a Galaxy Tab S7
+running Android 12 (#29). Code lives under
 `app/src/main/kotlin/dev/phonefocus/` in DDD layers: `domain`, `application`,
 `infrastructure`, `ui`. See [CLAUDE.md](CLAUDE.md) for conventions.

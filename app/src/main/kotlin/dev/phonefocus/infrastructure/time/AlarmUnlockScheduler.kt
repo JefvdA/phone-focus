@@ -13,7 +13,8 @@ import java.time.Duration
  * Schedules the unlock with an [AlarmManager] alarm on the monotonic clock
  * (`ELAPSED_REALTIME_WAKEUP`), so changing the system time does not move it.
  *
- * Uses an exact alarm when allowed (`USE_EXACT_ALARM` is granted at install). If exact alarms
+ * Uses an exact alarm when allowed (`USE_EXACT_ALARM` is granted at install on Android 13+;
+ * on Android 12 `SCHEDULE_EXACT_ALARM` is granted by default but can be revoked). If exact alarms
  * are not allowed it falls back to an inexact one: the unlock may then come a few minutes late,
  * never early, and the app also ticks on app start, boot and screen-on.
  */
