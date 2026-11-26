@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    kotlin("jvm")
 }
 
 // Fixed debug signing key (see README "Signing"). CI decodes the keystore from repo
@@ -49,8 +50,6 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildFeatures {
@@ -75,4 +74,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)
+    testImplementation(kotlin("test"))
+}
+kotlin {
+    jvmToolchain(27)
 }
